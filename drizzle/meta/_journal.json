@@ -15,6 +15,13 @@
       "when": 1789315556290,
       "tag": "0001_graceful_night_thrasher",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1789317570851,
+      "tag": "0002_vengeful_medusa",
+      "breakpoints": true
     }
   ]
 }

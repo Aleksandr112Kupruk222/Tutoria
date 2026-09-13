@@ -98,7 +98,7 @@ export function Shell({
   );
 }
 
-export function Library() {
+export function Library({folderPage=false}:{folderPage?:boolean}) {
   const [catalog, setCatalog] = useState<Catalog>({ folders: [], lessons: [] }),
     [loading, setLoading] = useState(true),
     [error, setError] = useState(""),
@@ -114,12 +114,12 @@ export function Library() {
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   };
-  useEffect(load, []);
+  useEffect(()=>{if(folderPage)setFolder(new URLSearchParams(window.location.search).get("id")||"");load();}, [folderPage]);
 
   const selected = catalog.folders.find((f) => f.id === folder);
   const results = catalog.lessons.filter(
     (e) =>
-      (!folder || e.folderId === folder) &&
+      (!folderPage || (!!folder && e.folderId === folder)) &&
       (level === "All levels" || e.lesson.difficulty === level) &&
       [e.lesson.title, e.lesson.description, ...e.lesson.tags]
         .join(" ")
@@ -129,7 +129,7 @@ export function Library() {
 
   return (
     <Shell>
-      <div className="page-heading">
+      {!folderPage && <><div className="page-heading">
         <div className="eyebrow">DIGITAL TECHNOLOGIES</div>
         <h1>
           Build skills. <span>Create possibilities.</span>
@@ -145,12 +145,15 @@ export function Library() {
         <p>Open a lesson folder to find your videos and step-by-step guides.</p>
       </div>
 
+      </>}
+      {folderPage && <><Link className="back" href="/">← All folders</Link><div className="library-heading"><div><div className="eyebrow">{selected?.teacher || "LESSON FOLDER"}</div><h1>{selected?.name || (loading?"Loading folder…":"Folder unavailable")}</h1><p>{selected?.description}</p></div></div></>}
       {error && (
         <div className="status error" role="alert">
           {error} <button onClick={load}>Try again</button>
         </div>
       )}
 
+      {!folderPage && <>
       <div className="library-heading">
         <div>
           <div className="eyebrow">YOUR LEARNING SPACE</div>
@@ -168,11 +171,10 @@ export function Library() {
       ) : (
         <div className="folder-grid">
           {catalog.folders.map((f) => (
-            <button
+            <Link
               key={f.id}
               className={`folder-card tone-${f.color} ${folder === f.id ? "chosen" : ""}`}
-              onClick={() => setFolder(folder === f.id ? "" : f.id)}
-              aria-pressed={folder === f.id}
+              href={`/folder/?id=${encodeURIComponent(f.id)}`}
             >
               <FolderOpen size={25} />
               <span className="folder-teacher">
@@ -184,7 +186,7 @@ export function Library() {
                 {catalog.lessons.filter((l) => l.folderId === f.id).length}{" "}
                 published lessons <ArrowRight size={17} />
               </span>
-            </button>
+            </Link>
           ))}
         </div>
       )}
@@ -203,9 +205,10 @@ export function Library() {
         </div>
       )}
 
+      </>}
       <div className="library-heading">
-        <h2>{selected?.name || "All published lessons"}</h2>
-        <span className="muted">{results.length} lessons</span>
+        <h2>{folderPage ? "Lessons" : "Search all lessons"}</h2>
+        <span className="muted">{folderPage||query||level!=="All levels" ? `${results.length} lessons` : ""}</span>
       </div>
       <div className="filters">
         <label className="search">
@@ -227,11 +230,11 @@ export function Library() {
           ))}
         </select>
       </div>
-      <div className="library-grid published-grid">
+      {(folderPage||query.trim()||level!=="All levels") && <div className="student-lesson-list">
         {results.map(({ id, lesson: l }) => (
           <Link
             href={`/lesson/?id=${encodeURIComponent(id)}`}
-            className="lesson-card"
+            className="lesson-card student-lesson-row"
             key={id}
           >
             <div className="lesson-art">
@@ -257,8 +260,9 @@ export function Library() {
             </div>
           </Link>
         ))}
-      </div>
-      {!loading && !error && !results.length && catalog.folders.length > 0 && (
+      </div>}
+      {!folderPage && !query.trim() && level==="All levels" && <p className="editor-help">Open a folder above, or search across every published lesson.</p>}
+      {!loading && !error && (folderPage||query.trim()||level!=="All levels") && !results.length && catalog.folders.length > 0 && (
         <div className="empty">
           <BookOpen size={28} />
           <h3>

@@ -64,6 +64,8 @@ try {
   );
   const extra=await readFile("drizzle/0001_graceful_night_thrasher.sql","utf8");
   await db.batch(extra.split("--> statement-breakpoint").map(s=>s.trim()).filter(Boolean).map(s=>db.prepare(s)));
+  const orderingMigration=await readFile("drizzle/0002_vengeful_medusa.sql","utf8");
+  await db.batch(orderingMigration.split("--> statement-breakpoint").map(s=>s.trim()).filter(Boolean).map(s=>db.prepare(s)));
   const request = (
     path,
     data,
@@ -201,6 +203,18 @@ try {
     assert.equal((await created.json()).entry.lesson.title, "Untitled lesson");
   }
   assert.equal((await request("/api/youtube/start", {}, ac)).status, 503);
+  const ordering=(await (await request("/api/teacher/catalog",undefined,ac)).json()).lessons.filter(l=>l.folderId===own.folderId);
+  const reversed=ordering.map(l=>l.id).reverse();
+  assert.equal((await request("/api/teacher/order",{folderId:own.folderId,ids:reversed},bc,"PUT")).status,409);
+  assert.equal((await request("/api/teacher/order",{folderId:own.folderId,ids:[reversed[0],reversed[0]]},ac,"PUT")).status,400);
+  assert.equal((await request("/api/teacher/order",{folderId:own.folderId,ids:reversed.slice(1)},ac,"PUT")).status,409);
+  assert.equal((await request("/api/teacher/order",{folderId:own.folderId,ids:reversed},ac,"PUT","https://attacker.test")).status,403);
+  assert.equal((await request("/api/teacher/order",{folderId:own.folderId,ids:reversed},ac,"PUT")).status,200);
+  assert.deepEqual((await (await request("/api/teacher/catalog",undefined,ac)).json()).lessons.filter(l=>l.folderId===own.folderId).map(l=>l.id),reversed);
+  const appended=await request("/api/teacher/lessons",{videoId:own.lesson.media[0].videoId,folderId:own.folderId},ac);
+  const appendedId=(await appended.json()).entry.id;
+  assert.equal((await (await request("/api/teacher/catalog",undefined,ac)).json()).lessons.filter(l=>l.folderId===own.folderId).at(-1).id,appendedId);
+  console.log("Passed folder ordering, duplicate/stale/foreign ID rejection, CSRF and append-at-end creation.");
   assert.equal((await request("/api/admin/accounts",undefined,ac)).status,403);
   const adminLogin=await request("/api/auth/login",{username:"admin",password:"1234"});
   const adminCookie=adminLogin.headers.get("set-cookie").split(";")[0];

@@ -185,7 +185,7 @@ export async function handleApi(request: Request, env: Env): Promise<Response> {
         ).all()
       ).results;
       const rows = await env.DB.prepare(
-        "SELECT id,folder_id,published_json FROM tutorials WHERE deleted=0 AND published_json IS NOT NULL ORDER BY updated_at DESC",
+        "SELECT id,folder_id,published_json FROM tutorials WHERE deleted=0 AND published_json IS NOT NULL ORDER BY folder_id,sort_order,id",
       ).all<{ id: string; folder_id: string; published_json: string }>();
       return json({
         folders,
@@ -255,7 +255,7 @@ export async function handleApi(request: Request, env: Env): Promise<Response> {
           .all()
       ).results;
       const rows = await env.DB.prepare(
-        "SELECT id,folder_id,draft_json,published_json IS NOT NULL AS published,revision,updated_at FROM tutorials WHERE owner_id=? AND deleted=0 ORDER BY updated_at DESC",
+        "SELECT id,folder_id,draft_json,published_json IS NOT NULL AS published,revision,updated_at FROM tutorials WHERE owner_id=? AND deleted=0 ORDER BY folder_id,sort_order,id",
       )
         .bind(user.id)
         .all<{
@@ -323,7 +323,7 @@ export async function handleApi(request: Request, env: Env): Promise<Response> {
       const id = random().slice(0, 24),
         lesson = blankLesson(data.title || "Untitled lesson", data.videoId, id, folder.name);
       await env.DB.prepare(
-        "INSERT INTO tutorials (id,owner_id,folder_id,draft_json,revision,updated_at) VALUES (?,?,?,?,1,?)",
+        "INSERT INTO tutorials (id,owner_id,folder_id,draft_json,revision,updated_at,sort_order) VALUES (?,?,?,?,1,?,(SELECT COALESCE(MAX(sort_order),0)+1 FROM tutorials WHERE folder_id=?3 AND deleted=0))",
       )
         .bind(
           id,
@@ -345,6 +345,15 @@ export async function handleApi(request: Request, env: Env): Promise<Response> {
         },
         201,
       );
+    }
+    if (path === "/api/teacher/order" && request.method === "PUT") {
+      const data=z.object({folderId:idSchema,ids:z.array(idSchema).min(1).max(500)}).parse(await body(request));
+      if(new Set(data.ids).size!==data.ids.length)throw new HttpError(400,"Each lesson must appear once.");
+      const rows=(await env.DB.prepare("SELECT id FROM tutorials WHERE owner_id=? AND folder_id=? AND deleted=0").bind(user.id,data.folderId).all<{id:string}>()).results;
+      if(rows.length!==data.ids.length||rows.some(r=>!data.ids.includes(r.id)))throw new HttpError(409,"The folder changed or contains unavailable lessons. Refresh and try again.");
+      const result=await env.DB.prepare("UPDATE tutorials SET sort_order=(SELECT CAST(key AS INTEGER)+1 FROM json_each(?1) WHERE value=tutorials.id) WHERE deleted=0 AND owner_id=?2 AND folder_id=?3 AND id IN (SELECT value FROM json_each(?1)) AND (SELECT COUNT(*) FROM tutorials WHERE owner_id=?2 AND folder_id=?3 AND deleted=0)=?4").bind(JSON.stringify(data.ids),user.id,data.folderId,data.ids.length).run();
+      if(result.meta.changes!==data.ids.length)throw new HttpError(409,"The folder changed. Refresh and try again.");
+      return json({ok:true});
     }
     if (path === "/api/teacher/lesson" && request.method === "DELETE") {
       const id=idSchema.parse(u.searchParams.get("id"));
@@ -375,8 +384,8 @@ export async function handleApi(request: Request, env: Env): Promise<Response> {
       const serialized = JSON.stringify(lesson);
       const statement =
         data.action === "save"
-          ? "UPDATE tutorials SET folder_id=?,draft_json=?,revision=revision+1,updated_at=? WHERE id=? AND owner_id=? AND deleted=0 AND revision=?"
-          : "UPDATE tutorials SET folder_id=?,draft_json=?,published_json=?,revision=revision+1,updated_at=? WHERE id=? AND owner_id=? AND deleted=0 AND revision=?";
+          ? "UPDATE tutorials SET sort_order=CASE WHEN folder_id<>?1 THEN (SELECT COALESCE(MAX(sort_order),0)+1 FROM tutorials WHERE folder_id=?1 AND deleted=0) ELSE sort_order END,folder_id=?1,draft_json=?,revision=revision+1,updated_at=? WHERE id=? AND owner_id=? AND deleted=0 AND revision=?"
+          : "UPDATE tutorials SET sort_order=CASE WHEN folder_id<>?1 THEN (SELECT COALESCE(MAX(sort_order),0)+1 FROM tutorials WHERE folder_id=?1 AND deleted=0) ELSE sort_order END,folder_id=?1,draft_json=?,published_json=?,revision=revision+1,updated_at=? WHERE id=? AND owner_id=? AND deleted=0 AND revision=?";
       const params =
         data.action === "save"
           ? [

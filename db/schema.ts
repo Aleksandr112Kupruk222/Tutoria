@@ -60,6 +60,7 @@ export const tutorials = sqliteTable(
       .notNull()
       .references(() => folders.id),
     deleted: integer("deleted").notNull().default(0),
+    sortOrder: integer("sort_order").notNull().default(0),
     draftJson: text("draft_json").notNull(),
     publishedJson: text("published_json"),
     revision: integer("revision").notNull().default(1),

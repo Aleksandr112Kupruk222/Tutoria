@@ -162,6 +162,14 @@ export default function Teacher() {
         }}
       />
     );
+  const reorder = async (id:string,direction:number) => {
+    const entry=catalog.lessons.find(l=>l.id===id)!;
+    const ids=catalog.lessons.filter(l=>l.folderId===entry.folderId).map(l=>l.id);
+    const index=ids.indexOf(id),other=index+direction;
+    if(other<0||other>=ids.length)return;
+    [ids[index],ids[other]]=[ids[other],ids[index]];
+    await run(async()=>{await api("/api/teacher/order",{folderId:entry.folderId,ids},"PUT");await refresh();setNotice("Lesson order saved. Students see published lessons in this order.");});
+  };
   const folders = catalog.folders;
   const filtered = catalog.lessons.filter(
     (l) => !folderId || l.folderId === folderId,
@@ -412,6 +420,7 @@ export default function Teacher() {
         )}
       </div>
       {deleting && <section className="exchange-stage"><h2>Delete {deleting.lesson.title}?</h2><p>This removes the lesson from your dashboard and student view, including any published version.</p><div className="editor-actions"><Button disabled={busy} className="primary" onClick={()=>void run(async()=>{await api(`/api/teacher/lesson?id=${deleting.id}`,{},"DELETE");setDeleting(null);await refresh();setNotice("Lesson deleted.");})}>Delete lesson</Button><Button className="secondary" onClick={()=>setDeleting(null)}>Cancel</Button></div></section>}
+      <p className="editor-help">Use Move up and Move down to arrange lessons within their folder. New videos are added at the end.</p>
       <div className="lesson-table">
         {filtered.map((e) => (
           <div className="lesson-row" key={e.id}>
@@ -457,6 +466,8 @@ export default function Teacher() {
               </select>
             </label>
             <div className="row-actions">
+              <Button className="secondary" disabled={busy||catalog.lessons.filter(l=>l.folderId===e.folderId)[0]?.id===e.id} aria-label={`Move ${e.lesson.title} up`} onClick={()=>void reorder(e.id,-1)}>Move up</Button>
+              <Button className="secondary" disabled={busy||catalog.lessons.filter(l=>l.folderId===e.folderId).at(-1)?.id===e.id} aria-label={`Move ${e.lesson.title} down`} onClick={()=>void reorder(e.id,1)}>Move down</Button>
               <Button className="secondary" disabled={busy} onClick={()=>setDeleting(e)}>Delete</Button>
               <Button className="secondary" onClick={() => setEditing(e)}>
                 Edit content
