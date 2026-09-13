@@ -6,6 +6,7 @@ import type { Lesson } from "@/lib/lessons";
 import { Shell, LessonView } from "@/components/tutoria";
 export default function LessonPage() {
   const [lesson, setLesson] = useState<Lesson | null>(null),
+    [folderId, setFolderId] = useState(""),
     [error, setError] = useState("");
   useEffect(() => {
     const id = new URLSearchParams(window.location.search).get("id");
@@ -13,12 +14,12 @@ export default function LessonPage() {
       setError("Choose a lesson from the library.");
       return;
     }
-    api<{ lesson: Lesson }>(`/api/lesson?id=${encodeURIComponent(id)}`)
-      .then((r) => setLesson(r.lesson))
+    api<{ lesson: Lesson; folderId: string }>(`/api/lesson?id=${encodeURIComponent(id)}`)
+      .then((r) => {setLesson(r.lesson);setFolderId(r.folderId);})
       .catch((e) => setError(e.message));
   }, []);
   return lesson ? (
-    <LessonView lesson={lesson} />
+    <LessonView lesson={lesson} folderId={folderId} />
   ) : (
     <Shell>
       <div className="empty">

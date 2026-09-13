@@ -5,7 +5,7 @@ export async function adminApi(request:Request,env:Env,user:Teacher){
   const url=new URL(request.url),path=url.pathname.replace(/\/$/,"");
   if(path==="/api/admin/accounts"&&request.method==="GET")return json({accounts:(await env.DB.prepare("SELECT id,username,name,role,must_change FROM teachers WHERE deleted=0 ORDER BY name").all()).results});
   if(path==="/api/admin/accounts"&&request.method==="POST"){
-    const v=z.object({username:z.string().trim().toLowerCase().regex(/^[a-z0-9][a-z0-9._-]{2,59}$/),name:z.string().trim().min(1).max(100),password:z.string().min(12).max(200)}).parse(await body(request));
+    const v=z.object({username:z.string().trim().toLowerCase().regex(/^[a-z0-9][a-z0-9._-]{2,59}$/),name:z.string().trim().min(1).max(100),password:z.string().min(8).max(200)}).parse(await body(request));
     if(await env.DB.prepare("SELECT id FROM teachers WHERE username=?").bind(v.username).first())throw new HttpError(409,"That username is already used or retired. Choose another.");
     await env.DB.prepare("INSERT INTO teachers(id,username,name,password_hash,must_change,created_at,role) VALUES (?,?,?,?,1,?,'teacher')").bind(random().slice(0,24),v.username,v.name,await hashPassword(v.password),new Date().toISOString()).run();
     return json({ok:true},201);

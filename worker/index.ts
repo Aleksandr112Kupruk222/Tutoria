@@ -3,7 +3,6 @@ import { z } from "zod";
 import {
   lessonSchema,
   draftLessonSchema,
-  sampleLesson,
   type Lesson,
 } from "../lib/lessons";
 import {
@@ -66,46 +65,18 @@ const blankLesson = (
   quiz: [],
   resources: [],
 });
-async function initialize(env: Env, owner: string) {
-  const now = new Date().toISOString();
-  const f = [
-    [
-      "unreal",
-      "Unreal Engine",
-      "Blueprints, gameplay and real-time worlds.",
-      "cyan",
-    ],
-    [
-      "modelling",
-      "3D Modelling",
-      "Model, texture and prepare game-ready assets.",
-      "magenta",
-    ],
-    ["sample", "Sample lessons", "A complete example to explore.", "green"],
-  ];
-  await env.DB.batch(
-    f.map(([id, name, desc, color]) =>
-      env.DB.prepare(
-        "INSERT OR IGNORE INTO folders (id,owner_id,name,description,color,created_at) VALUES (?,?,?,?,?,?)",
-      ).bind(`${owner}-${id}`, owner, name, desc, color, now),
-    ),
-  );
-  await env.DB.prepare(
-    "INSERT OR IGNORE INTO tutorials (id,owner_id,folder_id,draft_json,published_json,revision,updated_at) VALUES (?,?,?,?,?,1,?)",
-  )
-    .bind(
-      `${owner}-example`,
-      owner,
-      `${owner}-sample`,
-      JSON.stringify({
-        ...sampleLesson,
-        id: `${owner}-example`,
-        slug: `${owner}-example`,
-      }),
-      null,
-      now,
-    )
-    .run();
+// Consolidate legacy, automatically created starter folders without touching custom folders.
+// Each batch moves every lesson before removing the duplicate, preserving foreign keys.
+async function mergeStarterFolders(env: Env) {
+  const legacy = "id = owner_id || '-unreal' OR id = owner_id || '-modelling' OR id = owner_id || '-sample'";
+  const groups = (await env.DB.prepare(`SELECT name, MIN(created_at || '|' || id) AS first FROM folders WHERE ${legacy} GROUP BY name HAVING COUNT(*) > 1`).all<{name:string;first:string}>()).results;
+  for (const group of groups) {
+    const canonical = group.first.split('|').slice(1).join('|');
+    await env.DB.batch([
+      env.DB.prepare(`UPDATE tutorials SET folder_id=?, revision=revision+1 WHERE folder_id IN (SELECT id FROM folders WHERE (${legacy}) AND name=? AND id<>?)`).bind(canonical,group.name,canonical),
+      env.DB.prepare(`DELETE FROM folders WHERE (${legacy}) AND name=? AND id<>?`).bind(group.name,canonical),
+    ]);
+  }
 }
 export async function handleApi(request: Request, env: Env): Promise<Response> {
   const u = new URL(request.url),
@@ -179,13 +150,14 @@ export async function handleApi(request: Request, env: Env): Promise<Response> {
       });
     }
     if (path === "/api/catalog" && request.method === "GET") {
+      await mergeStarterFolders(env);
       const folders = (
         await env.DB.prepare(
-          "SELECT f.id,f.name,f.description,f.color,t.name AS teacher FROM folders f JOIN teachers t ON t.id=f.owner_id WHERE t.deleted=0 ORDER BY f.created_at,f.id",
+          "SELECT id,name,description,color FROM folders WHERE id<>'unassigned' ORDER BY created_at,id",
         ).all()
       ).results;
       const rows = await env.DB.prepare(
-        "SELECT id,folder_id,published_json FROM tutorials WHERE deleted=0 AND published_json IS NOT NULL ORDER BY folder_id,sort_order,id",
+        "SELECT id,folder_id,published_json FROM tutorials WHERE deleted=0 AND folder_id<>'unassigned' AND published_json IS NOT NULL ORDER BY folder_id,sort_order,id",
       ).all<{ id: string; folder_id: string; published_json: string }>();
       return json({
         folders,
@@ -199,12 +171,12 @@ export async function handleApi(request: Request, env: Env): Promise<Response> {
     if (path === "/api/lesson" && request.method === "GET") {
       const id = idSchema.parse(u.searchParams.get("id"));
       const row = await env.DB.prepare(
-        "SELECT published_json FROM tutorials WHERE id=? AND deleted=0 AND published_json IS NOT NULL",
+        "SELECT folder_id,published_json FROM tutorials WHERE id=? AND folder_id<>'unassigned' AND deleted=0 AND published_json IS NOT NULL",
       )
         .bind(id)
-        .first<{ published_json: string }>();
+        .first<{ folder_id: string; published_json: string }>();
       if (!row) throw new HttpError(404, "This lesson is not published.");
-      return json({ lesson: JSON.parse(row.published_json) });
+      return json({ lesson: JSON.parse(row.published_json), folderId: row.folder_id });
     }
     const user = await requireTeacher(
       request,
@@ -243,16 +215,14 @@ export async function handleApi(request: Request, env: Env): Promise<Response> {
           "DELETE FROM sessions WHERE teacher_id=? AND token_hash<>?",
         ).bind(user.id, user.sessionHash),
       ]);
-      if(user.role !== "admin") await initialize(env, user.id);
       return json({ ok: true });
     }
     if (path === "/api/teacher/catalog" && request.method === "GET") {
+      await mergeStarterFolders(env);
       const folders = (
         await env.DB.prepare(
-          "SELECT id,name,description,color FROM folders WHERE owner_id=? ORDER BY created_at,id",
-        )
-          .bind(user.id)
-          .all()
+          "SELECT id,name,description,color FROM folders ORDER BY created_at,id",
+        ).all()
       ).results;
       const rows = await env.DB.prepare(
         "SELECT id,folder_id,draft_json,published_json IS NOT NULL AS published,revision,updated_at FROM tutorials WHERE owner_id=? AND deleted=0 ORDER BY folder_id,sort_order,id",
@@ -295,13 +265,24 @@ export async function handleApi(request: Request, env: Env): Promise<Response> {
         .run();
       return json({ folder: { id, ...data } }, 201);
     }
+    if (path === "/api/teacher/folder" && request.method === "DELETE") {
+      const id = idSchema.parse(u.searchParams.get("id"));
+      if(id === "unassigned") throw new HttpError(400,"Unassigned cannot be deleted.");
+      if(!await env.DB.prepare("SELECT id FROM folders WHERE id=?").bind(id).first()) throw new HttpError(404,"Folder not found.");
+      await env.DB.batch([
+        env.DB.prepare("INSERT OR IGNORE INTO folders (id,owner_id,name,description,color,created_at) VALUES ('unassigned',?,'Unassigned','Teacher-only drafts. Choose a lesson folder before publishing.','cyan',?)").bind(user.id,new Date().toISOString()),
+        env.DB.prepare("UPDATE tutorials SET folder_id='unassigned',published_json=NULL,revision=revision+1,updated_at=? WHERE folder_id=?").bind(new Date().toISOString(),id),
+        env.DB.prepare("DELETE FROM folders WHERE id=?").bind(id),
+      ]);
+      return json({ok:true});
+    }
     if (path === "/api/teacher/folder" && request.method === "PUT") {
       const id = idSchema.parse(u.searchParams.get("id")),
         data = folderSchema.parse(await body(request));
       const result = await env.DB.prepare(
-        "UPDATE folders SET name=?,description=?,color=? WHERE id=? AND owner_id=?",
+        "UPDATE folders SET name=?,description=?,color=? WHERE id=? AND id<>'unassigned'",
       )
-        .bind(data.name, data.description, data.color, id, user.id)
+        .bind(data.name, data.description, data.color, id)
         .run();
       if (!result.meta.changes) throw new HttpError(404, "Folder not found.");
       return json({ ok: true });
@@ -315,11 +296,11 @@ export async function handleApi(request: Request, env: Env): Promise<Response> {
         })
         .parse(await body(request));
       const folder = await env.DB.prepare(
-        "SELECT name FROM folders WHERE id=? AND owner_id=?",
+        "SELECT name FROM folders WHERE id=?",
       )
-        .bind(data.folderId, user.id)
+        .bind(data.folderId)
         .first<{ name: string }>();
-      if (!folder) throw new HttpError(400, "Choose one of your folders.");
+      if (!folder) throw new HttpError(400, "Choose an available folder.");
       const id = random().slice(0, 24),
         lesson = blankLesson(data.title || "Untitled lesson", data.videoId, id, folder.name);
       await env.DB.prepare(
@@ -374,12 +355,13 @@ export async function handleApi(request: Request, env: Env): Promise<Response> {
       if (data.lesson.id !== id)
         throw new HttpError(400, "A lesson ID cannot be changed.");
       const folder = await env.DB.prepare(
-        "SELECT name FROM folders WHERE id=? AND owner_id=?",
+        "SELECT name FROM folders WHERE id=?",
       )
-        .bind(data.folderId, user.id)
+        .bind(data.folderId)
         .first<{ name: string }>();
-      if (!folder) throw new HttpError(400, "Choose one of your folders.");
+      if (!folder) throw new HttpError(400, "Choose an available folder.");
       const lesson = { ...data.lesson, module: folder.name };
+      if (data.action === "publish" && data.folderId === "unassigned") throw new HttpError(400,"Choose a lesson folder before publishing.");
       if (data.action === "publish") lessonSchema.parse(lesson);
       const serialized = JSON.stringify(lesson);
       const statement =

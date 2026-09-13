@@ -146,7 +146,7 @@ export function Library({folderPage=false}:{folderPage?:boolean}) {
       </div>
 
       </>}
-      {folderPage && <><Link className="back" href="/">← All folders</Link><div className="library-heading"><div><div className="eyebrow">{selected?.teacher || "LESSON FOLDER"}</div><h1>{selected?.name || (loading?"Loading folder…":"Folder unavailable")}</h1><p>{selected?.description}</p></div></div></>}
+      {folderPage && <><Link className="back" href="/">← All folders</Link><div className="library-heading"><div><div className="eyebrow">LESSON FOLDER</div><h1>{selected?.name || (loading?"Loading folder…":"Folder unavailable")}</h1><p>{selected?.description}</p></div></div></>}
       {error && (
         <div className="status error" role="alert">
           {error} <button onClick={load}>Try again</button>
@@ -178,7 +178,7 @@ export function Library({folderPage=false}:{folderPage?:boolean}) {
             >
               <FolderOpen size={25} />
               <span className="folder-teacher">
-                {f.teacher || "LESSON FOLDER"}
+                LESSON FOLDER
               </span>
               <h3>{f.name}</h3>
               <p>{f.description}</p>
@@ -313,11 +313,13 @@ export function LessonView({
 
   preview = false,
   onExitPreview,
+  folderId,
 }: {
   lesson: Lesson;
 
   preview?: boolean;
   onExitPreview?:()=>void;
+  folderId?:string;
 }) {
   const [tab, setTab] = useState("Guide"),
     [step, setStep] = useState(0),
@@ -347,7 +349,7 @@ export function LessonView({
 
   return (
     <Shell active="lesson">
-      {preview?<button className="back" onClick={onExitPreview}><ArrowLeft size={15}/>Back to editor</button>:<Link className="back" href="/"><ArrowLeft size={15}/>All tutorials</Link>}
+      {preview?<button className="back" onClick={onExitPreview}><ArrowLeft size={15}/>Back to editor</button>:<Link className="back" href={folderId?`/folder/?id=${encodeURIComponent(folderId)}`:"/"}><ArrowLeft size={15}/>{folderId?"Back to folder":"All tutorials"}</Link>}
       <div className="lesson-heading">
         <div>
           <div className="eyebrow">

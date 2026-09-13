@@ -125,6 +125,13 @@ try {
     ).status,
     200,
   );
+  // Simulate an existing installation with duplicated starter folders.
+  for(const owner of ["aleks","ben"]){
+    for(const [suffix,name] of [["unreal","Unreal Engine"],["modelling","3D Modelling"],["sample","Sample lessons"]])
+      await db.prepare("INSERT INTO folders(id,owner_id,name,description,color,created_at) VALUES (?,?,?,'','cyan',?)").bind(`${owner}-${suffix}`,owner,name,owner==="aleks"?"2026-01-01":"2026-02-01").run();
+    const lesson={...sample,id:`${owner}-example`,slug:`${owner}-example`};
+    await db.prepare("INSERT INTO tutorials(id,owner_id,folder_id,draft_json,revision,updated_at) VALUES (?,?,?,?,1,'2026-02-01')").bind(lesson.id,owner,`${owner}-sample`,JSON.stringify(lesson)).run();
+  }
   const cat = await (
     await request("/api/teacher/catalog", undefined, ac)
   ).json();
@@ -136,7 +143,9 @@ try {
     bc,
     "PUT",
   );
-  assert.equal(badFolder.status, 404);
+  assert.equal(badFolder.status, 200);
+  assert.deepEqual((await (await request("/api/teacher/catalog",undefined,bc)).json()).folders.map(f=>f.id),cat.folders.map(f=>f.id));
+  assert.equal((await db.prepare("SELECT folder_id FROM tutorials WHERE id='ben-example'").first()).folder_id,"aleks-sample");
   const own = cat.lessons[0];
   const payload = {
     lesson: {...own.lesson, teacherReviewNotes: ["Teacher-only check"]},
@@ -147,7 +156,7 @@ try {
   assert.equal(
     (await request("/api/teacher/lesson?id=" + own.id, payload, bc, "PUT"))
       .status,
-    400,
+    409,
   );
   assert.equal(
     (
@@ -222,16 +231,47 @@ try {
   assert.equal((await request("/api/auth/password",{password:"admin-new-password"},adminCookie)).status,200);
   assert.equal((await request("/api/admin/accounts",undefined,adminCookie)).status,200);
   assert.equal((await request("/api/admin/account?id=admin",{},adminCookie,"DELETE")).status,400);
-  assert.equal((await request("/api/admin/accounts",{username:"computing",name:"Computing Teacher",password:"initial-password"},adminCookie)).status,201);
-  assert.equal((await request("/api/admin/accounts",{username:"computing",name:"Duplicate",password:"initial-password"},adminCookie)).status,409);
-  const newLogin=await request("/api/auth/login",{username:"computing",password:"initial-password"});
+  assert.equal((await request("/api/admin/accounts",{username:"computing",name:"Computing Teacher",password:"eight123"},adminCookie)).status,201);
+  assert.equal((await request("/api/admin/accounts",{username:"computing",name:"Duplicate",password:"eight123"},adminCookie)).status,409);
+  const newLogin=await request("/api/auth/login",{username:"computing",password:"eight123"});
   const newCookie=newLogin.headers.get("set-cookie").split(";")[0];
+  assert.equal((await request("/api/auth/password",{password:"eight123"},newCookie)).status,400);
+  assert.equal((await request("/api/auth/password",{password:"longer-new-password"},newCookie)).status,200);
+  assert.equal((await (await request("/api/teacher/catalog",undefined,newCookie)).json()).folders.length,3);
+  assert.equal((await (await request("/api/teacher/catalog",undefined,newCookie)).json()).lessons.length,0);
   const teacherList=(await (await request("/api/admin/accounts",undefined,adminCookie)).json()).accounts;
   const newId=teacherList.find(t=>t.username==="computing").id;
   assert.equal((await request("/api/admin/password?id="+newId,{password:"replacement-password"},adminCookie)).status,200);
   assert.equal((await request("/api/teacher/session",undefined,newCookie)).status,401);
-  assert.equal((await request("/api/auth/login",{username:"computing",password:"initial-password"})).status,401);
+  assert.equal((await request("/api/auth/login",{username:"computing",password:"eight123"})).status,401);
   assert.equal((await request("/api/auth/login",{username:"computing",password:"replacement-password"})).status,200);
+  assert.equal((await (await request("/api/lesson?id="+own.id)).json()).folderId,own.folderId);
+  const sharedFolder=(await (await request("/api/teacher/folders",{name:"Shared computing",description:"",color:"cyan"},bc)).json()).folder;
+  const sharedLesson=(await (await request("/api/teacher/lessons",{videoId:own.lesson.media[0].videoId,folderId:sharedFolder.id},ac)).json()).entry;
+  const benLesson=(await (await request("/api/teacher/lessons",{videoId:own.lesson.media[0].videoId,folderId:sharedFolder.id},bc)).json()).entry;
+  const validShared={...sample,id:sharedLesson.id,slug:sharedLesson.id};
+  assert.equal((await request("/api/teacher/lesson?id="+sharedLesson.id,{lesson:validShared,folderId:sharedFolder.id,revision:1,action:"publish"},ac,"PUT")).status,200);
+  assert.equal((await request("/api/teacher/folder?id="+sharedFolder.id,{},ac,"DELETE","https://attacker.test")).status,403);
+  assert.equal((await request("/api/teacher/folder?id="+sharedFolder.id,{},ac,"DELETE")).status,200);
+  assert.equal((await request("/api/teacher/folder?id="+sharedFolder.id,{},ac,"DELETE")).status,404);
+  assert.equal((await request("/api/teacher/folder?id=unassigned",{},ac,"DELETE")).status,400);
+  assert.equal((await request("/api/teacher/folder?id=unassigned",{name:"Visible",description:"",color:"cyan"},ac,"PUT")).status,404);
+  for(const [id,cookie] of [[sharedLesson.id,ac],[benLesson.id,bc]]){
+    const saved=(await (await request("/api/teacher/catalog",undefined,cookie)).json()).lessons.find(l=>l.id===id);
+    assert.equal(saved.folderId,"unassigned");assert.equal(saved.published,false);
+    assert.equal(saved.lesson.media[0].videoId,own.lesson.media[0].videoId);
+  }
+  assert.equal((await request("/api/lesson?id="+sharedLesson.id)).status,404);
+  const publicCatalog=await (await request("/api/catalog")).json();
+  assert(!publicCatalog.folders.some(f=>f.id==="unassigned"||f.id===sharedFolder.id));
+  assert(publicCatalog.folders.every(f=>f.teacher===undefined));
+  assert(!publicCatalog.lessons.some(l=>l.id===sharedLesson.id));
+  assert.equal((await request("/api/teacher/lesson?id="+sharedLesson.id,{lesson:validShared,folderId:"unassigned",revision:3,action:"publish"},ac,"PUT")).status,400);
+  assert.equal((await request("/api/teacher/lesson?id="+sharedLesson.id,{lesson:validShared,folderId:own.folderId,revision:2,action:"save"},ac,"PUT")).status,409);
+  assert.equal((await request("/api/teacher/lesson?id="+sharedLesson.id,{lesson:validShared,folderId:own.folderId,revision:3,action:"publish"},ac,"PUT")).status,200);
+  assert.equal((await request("/api/lesson?id="+sharedLesson.id)).status,200);
+  const retained=(await (await request("/api/teacher/folders",{name:"Retained shared folder",description:"",color:"cyan"},bc)).json()).folder;
+  console.log("Passed shared folders, legacy consolidation, lossless deletion, hidden Unassigned, republishing and 8/12-character passwords.");
   assert.equal((await request("/api/teacher/lesson?id="+own.id,{},bc,"DELETE")).status,404);
   assert.equal((await request("/api/teacher/lesson?id="+own.id,{},ac,"DELETE","https://attacker.test")).status,403);
   assert.equal((await request("/api/teacher/lesson?id="+own.id,{},ac,"DELETE")).status,200);
@@ -241,7 +281,7 @@ try {
   assert.equal((await request("/api/teacher/session",undefined,bc)).status,401);
   assert.equal((await request("/api/auth/login",{username:"ben",password:"1234"})).status,401);
   assert.equal((await db.prepare("SELECT deleted FROM teachers WHERE id='ben'").first()).deleted,1);
-  assert(!(await (await request("/api/catalog")).json()).folders.some(f=>f.id.startsWith("ben-")));
+  assert((await (await request("/api/catalog")).json()).folders.some(f=>f.id===retained.id));
   console.log("Passed admin role isolation, required first password change, account creation/reset/deletion, session revocation, no bootstrap resurrection and owner-only lesson deletion.");
   assert.equal((await request("/api/auth/logout", {}, ac)).status, 200);
   assert.equal(

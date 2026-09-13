@@ -43,6 +43,7 @@ export default function Teacher() {
     [title, setTitle] = useState(""),
     [url, setUrl] = useState(""),
     [targetFolder, setTargetFolder] = useState(""),
+    [deletingFolder, setDeletingFolder] = useState(false),
     [deleting, setDeleting] = useState<Entry | null>(null),
     [editing, setEditing] = useState<Entry | null>(null),
     [password, setPassword] = useState(""), [transcriptText,setTranscriptText]=useState("");
@@ -50,7 +51,7 @@ export default function Teacher() {
     const sync=()=>{setFolderId(new URLSearchParams(window.location.search).get("folder")||"");setDeleting(null);setView("list");};
     sync();window.addEventListener("popstate",sync);return()=>window.removeEventListener("popstate",sync);
   },[]);
-  const openFolder=(id:string)=>{setFolderId(id);setTargetFolder(id);setView("list");setDeleting(null);setNotice("");setError("");window.history.pushState({},"",id?`/teacher/?folder=${encodeURIComponent(id)}`:"/teacher/");};
+  const openFolder=(id:string)=>{setDeletingFolder(false);setFolderId(id);setTargetFolder(id);setView("list");setDeleting(null);setNotice("");setError("");window.history.pushState({},"",id?`/teacher/?folder=${encodeURIComponent(id)}`:"/teacher/");};
   const refresh = async () => {
     const s = await api<Session>("/api/teacher/session");
     setSession(s);
@@ -374,7 +375,7 @@ export default function Teacher() {
       )}
       {!folderId && <>
       <div className="library-heading">
-        <h2>Your lesson folders</h2>
+        <h2>Shared lesson folders</h2>
         <Button
           className="secondary"
           onClick={() => {
@@ -409,7 +410,7 @@ export default function Teacher() {
                 lessons <ArrowRight size={16} />
               </span>
             </button>
-            <button
+            {f.id !== "unassigned" && <button
               className="folder-edit"
               aria-label={`Edit ${f.name}`}
               onClick={() => {
@@ -421,7 +422,7 @@ export default function Teacher() {
               }}
             >
               <Settings2 size={16} />
-            </button>
+            </button>}
           </div>
         ))}
       </div>
@@ -439,8 +440,11 @@ export default function Teacher() {
           </button>
         )}
       </div>
+      {folderId !== "unassigned" && <Button className="secondary" disabled={busy} onClick={()=>setDeletingFolder(true)}>Delete folder</Button>}
+      {folderId === "unassigned" && <p className="status">Only teachers can see this folder. Move your lessons to a shared folder before publishing.</p>}
+      {deletingFolder && <section className="exchange-stage"><h2>Delete this shared folder?</h2><p>Lessons from every teacher will be moved to Unassigned and returned to drafts. No videos or lesson content will be deleted.</p><div className="editor-actions"><Button className="primary" disabled={busy} onClick={()=>void run(async()=>{await api(`/api/teacher/folder?id=${encodeURIComponent(folderId)}`,{},"DELETE");await refresh();openFolder("unassigned");setNotice("Folder deleted. Lessons are safely stored in Unassigned as drafts.");})}>Delete folder and keep lessons</Button><Button className="secondary" disabled={busy} onClick={()=>setDeletingFolder(false)}>Cancel</Button></div></section>}
       {deleting && <section className="exchange-stage"><h2>Delete {deleting.lesson.title}?</h2><p>This removes the lesson from your dashboard and student view, including any published version.</p><div className="editor-actions"><Button disabled={busy} className="primary" onClick={()=>void run(async()=>{await api(`/api/teacher/lesson?id=${deleting.id}`,{},"DELETE");setDeleting(null);await refresh();setNotice("Lesson deleted.");})}>Delete lesson</Button><Button className="secondary" onClick={()=>setDeleting(null)}>Cancel</Button></div></section>}
-      <p className="editor-help">Drag the grip on a lesson to reorder it. You can also use Move up and Move down. New videos are added at the end.</p>
+      <p className="editor-help">You are viewing your lessons in this shared folder. Drag the grip on a lesson to reorder it. You can also use Move up and Move down. New videos are added at the end.</p>
       <div className="lesson-table">
         {filtered.map((e) => (
           <div className={`lesson-row draggable-lesson ${dragId===e.id?"is-dragging":""} ${dropId===e.id?"drop-target":""}`} key={e.id}
