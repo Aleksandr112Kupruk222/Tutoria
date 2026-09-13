@@ -239,7 +239,7 @@ export function Library({folderPage=false}:{folderPage?:boolean}) {
           >
             <div className="lesson-art">
               <img
-                src={`https://i.ytimg.com/vi/${l.media[0].videoId}/hqdefault.jpg`}
+                src={`https://i.ytimg.com/vi/${l.media[0].videoId}/mqdefault.jpg`}
                 alt={l.title}
               />
               <span className="play-circle">
@@ -399,7 +399,7 @@ export function LessonView({
                 aria-label="Play lesson video"
               >
                 <img
-                  src={`https://i.ytimg.com/vi/${video.videoId}/hqdefault.jpg`}
+                  src={`https://i.ytimg.com/vi/${video.videoId}/mqdefault.jpg`}
 
                   alt="Video thumbnail"
                 />

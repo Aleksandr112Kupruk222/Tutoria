@@ -33,6 +33,8 @@ export default function Teacher() {
     [notice, setNotice] = useState(""),
     [busy, setBusy] = useState(false),
     [view, setView] = useState<"list" | "folder" | "video">("list"),
+    [dragId, setDragId] = useState(""),
+    [dropId, setDropId] = useState(""),
     [folderId, setFolderId] = useState(""),
     [folderEdit, setFolderEdit] = useState<Folder | null>(null),
     [name, setName] = useState(""),
@@ -44,6 +46,11 @@ export default function Teacher() {
     [deleting, setDeleting] = useState<Entry | null>(null),
     [editing, setEditing] = useState<Entry | null>(null),
     [password, setPassword] = useState(""), [transcriptText,setTranscriptText]=useState("");
+  useEffect(()=>{
+    const sync=()=>{setFolderId(new URLSearchParams(window.location.search).get("folder")||"");setDeleting(null);setView("list");};
+    sync();window.addEventListener("popstate",sync);return()=>window.removeEventListener("popstate",sync);
+  },[]);
+  const openFolder=(id:string)=>{setFolderId(id);setTargetFolder(id);setView("list");setDeleting(null);setNotice("");setError("");window.history.pushState({},"",id?`/teacher/?folder=${encodeURIComponent(id)}`:"/teacher/");};
   const refresh = async () => {
     const s = await api<Session>("/api/teacher/session");
     setSession(s);
@@ -170,6 +177,15 @@ export default function Teacher() {
     [ids[index],ids[other]]=[ids[other],ids[index]];
     await run(async()=>{await api("/api/teacher/order",{folderId:entry.folderId,ids},"PUT");await refresh();setNotice("Lesson order saved. Students see published lessons in this order.");});
   };
+  const dropLesson = async (target:string) => {
+    const source=dragId;setDragId("");setDropId("");
+    if(busy||!source||source===target)return;
+    const ids=catalog.lessons.filter(l=>l.folderId===folderId).map(l=>l.id);
+    const from=ids.indexOf(source),to=ids.indexOf(target);
+    if(from<0||to<0)return;
+    ids.splice(from,1);ids.splice(to,0,source);
+    await run(async()=>{await api("/api/teacher/order",{folderId,ids},"PUT");await refresh();setNotice("Lesson order saved.");});
+  };
   const folders = catalog.folders;
   const filtered = catalog.lessons.filter(
     (l) => !folderId || l.folderId === folderId,
@@ -190,6 +206,7 @@ export default function Teacher() {
         <Button
           className="primary"
           onClick={() => {
+            if(folderId)setTargetFolder(folderId);
             setView("video");
             setTitle("");
             setUrl("");
@@ -355,6 +372,7 @@ export default function Teacher() {
           </div>
         </form>
       )}
+      {!folderId && <>
       <div className="library-heading">
         <h2>Your lesson folders</h2>
         <Button
@@ -380,7 +398,7 @@ export default function Teacher() {
           >
             <button
               className="folder-main"
-              onClick={() => setFolderId(folderId === f.id ? "" : f.id)}
+              onClick={() => openFolder(f.id)}
               aria-pressed={folderId === f.id}
             >
               <FolderOpen size={25} />
@@ -407,6 +425,8 @@ export default function Teacher() {
           </div>
         ))}
       </div>
+      </>}
+      {folderId && <>
       <div className="library-heading">
         <h2>
           {folderId
@@ -414,18 +434,23 @@ export default function Teacher() {
             : "All your lessons"}
         </h2>
         {folderId && (
-          <button className="secondary" onClick={() => setFolderId("")}>
-            Show all
+          <button className="secondary" onClick={() => openFolder("")}>
+            ← All folders
           </button>
         )}
       </div>
       {deleting && <section className="exchange-stage"><h2>Delete {deleting.lesson.title}?</h2><p>This removes the lesson from your dashboard and student view, including any published version.</p><div className="editor-actions"><Button disabled={busy} className="primary" onClick={()=>void run(async()=>{await api(`/api/teacher/lesson?id=${deleting.id}`,{},"DELETE");setDeleting(null);await refresh();setNotice("Lesson deleted.");})}>Delete lesson</Button><Button className="secondary" onClick={()=>setDeleting(null)}>Cancel</Button></div></section>}
-      <p className="editor-help">Use Move up and Move down to arrange lessons within their folder. New videos are added at the end.</p>
+      <p className="editor-help">Drag the grip on a lesson to reorder it. You can also use Move up and Move down. New videos are added at the end.</p>
       <div className="lesson-table">
         {filtered.map((e) => (
-          <div className="lesson-row" key={e.id}>
+          <div className={`lesson-row draggable-lesson ${dragId===e.id?"is-dragging":""} ${dropId===e.id?"drop-target":""}`} key={e.id}
+            onDragOver={event=>{if(!busy&&dragId&&dragId!==e.id){event.preventDefault();event.dataTransfer.dropEffect="move";setDropId(e.id);}}}
+            onDrop={event=>{event.preventDefault();void dropLesson(e.id);}}>
+            <button type="button" className="drag-handle" draggable={!busy} disabled={busy} aria-label={`Drag to reorder ${e.lesson.title}`}
+              onDragStart={event=>{event.dataTransfer.setData("text/plain",e.id);event.dataTransfer.effectAllowed="move";setDragId(e.id);}}
+              onDragEnd={()=>{setDragId("");setDropId("");}}>⠿</button>
             <img
-              src={`https://i.ytimg.com/vi/${e.lesson.media[0].videoId}/default.jpg`}
+              src={`https://i.ytimg.com/vi/${e.lesson.media[0].videoId}/mqdefault.jpg`}
               alt=""
             />
             <div className="lesson-row-title">
@@ -509,6 +534,7 @@ export default function Teacher() {
           <p>Add a video to start your first draft.</p>
         </div>
       )}
+      </>}
     </Shell>
   );
 }
