@@ -49,7 +49,7 @@ const mf = new Miniflare({
   scriptPath: "dist/server/index.js",
   compatibilityDate: "2026-05-15",
   d1Databases: ["DB"],
-  bindings: { BOOTSTRAP_ACCOUNTS: JSON.stringify(accounts) },
+  bindings: { BOOTSTRAP_ACCOUNTS: JSON.stringify(accounts), ADMIN_BOOTSTRAP_HASH: accounts[0].hash },
   serviceBindings: { ASSETS: async () => new Response("asset") },
 });
 try {
@@ -62,6 +62,8 @@ try {
       .filter(Boolean)
       .map((s) => db.prepare(s)),
   );
+  const extra=await readFile("drizzle/0001_graceful_night_thrasher.sql","utf8");
+  await db.batch(extra.split("--> statement-breakpoint").map(s=>s.trim()).filter(Boolean).map(s=>db.prepare(s)));
   const request = (
     path,
     data,
@@ -199,6 +201,34 @@ try {
     assert.equal((await created.json()).entry.lesson.title, "Untitled lesson");
   }
   assert.equal((await request("/api/youtube/start", {}, ac)).status, 503);
+  assert.equal((await request("/api/admin/accounts",undefined,ac)).status,403);
+  const adminLogin=await request("/api/auth/login",{username:"admin",password:"1234"});
+  const adminCookie=adminLogin.headers.get("set-cookie").split(";")[0];
+  assert.equal((await request("/api/admin/accounts",undefined,adminCookie)).status,428);
+  assert.equal((await request("/api/auth/password",{password:"admin-new-password"},adminCookie)).status,200);
+  assert.equal((await request("/api/admin/accounts",undefined,adminCookie)).status,200);
+  assert.equal((await request("/api/admin/account?id=admin",{},adminCookie,"DELETE")).status,400);
+  assert.equal((await request("/api/admin/accounts",{username:"computing",name:"Computing Teacher",password:"initial-password"},adminCookie)).status,201);
+  assert.equal((await request("/api/admin/accounts",{username:"computing",name:"Duplicate",password:"initial-password"},adminCookie)).status,409);
+  const newLogin=await request("/api/auth/login",{username:"computing",password:"initial-password"});
+  const newCookie=newLogin.headers.get("set-cookie").split(";")[0];
+  const teacherList=(await (await request("/api/admin/accounts",undefined,adminCookie)).json()).accounts;
+  const newId=teacherList.find(t=>t.username==="computing").id;
+  assert.equal((await request("/api/admin/password?id="+newId,{password:"replacement-password"},adminCookie)).status,200);
+  assert.equal((await request("/api/teacher/session",undefined,newCookie)).status,401);
+  assert.equal((await request("/api/auth/login",{username:"computing",password:"initial-password"})).status,401);
+  assert.equal((await request("/api/auth/login",{username:"computing",password:"replacement-password"})).status,200);
+  assert.equal((await request("/api/teacher/lesson?id="+own.id,{},bc,"DELETE")).status,404);
+  assert.equal((await request("/api/teacher/lesson?id="+own.id,{},ac,"DELETE","https://attacker.test")).status,403);
+  assert.equal((await request("/api/teacher/lesson?id="+own.id,{},ac,"DELETE")).status,200);
+  assert.equal((await request("/api/lesson?id="+own.id)).status,404);
+  assert.equal((await request("/api/teacher/lesson?id="+own.id,{...payload,revision:3},ac,"PUT")).status,409);
+  assert.equal((await request("/api/admin/account?id=ben",{},adminCookie,"DELETE")).status,200);
+  assert.equal((await request("/api/teacher/session",undefined,bc)).status,401);
+  assert.equal((await request("/api/auth/login",{username:"ben",password:"1234"})).status,401);
+  assert.equal((await db.prepare("SELECT deleted FROM teachers WHERE id='ben'").first()).deleted,1);
+  assert(!(await (await request("/api/catalog")).json()).folders.some(f=>f.id.startsWith("ben-")));
+  console.log("Passed admin role isolation, required first password change, account creation/reset/deletion, session revocation, no bootstrap resurrection and owner-only lesson deletion.");
   assert.equal((await request("/api/auth/logout", {}, ac)).status, 200);
   assert.equal(
     (await request("/api/teacher/catalog", undefined, ac)).status,

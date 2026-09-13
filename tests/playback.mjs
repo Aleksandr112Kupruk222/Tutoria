@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import {build} from 'esbuild';
+await build({entryPoints:['lib/playback.ts'],outfile:'.sites-runtime/playback.mjs',bundle:true,platform:'node',format:'esm'});
+const {stepAtTime}=await import('../.sites-runtime/playback.mjs');
+const steps=[{mediaId:'a',seconds:60},{mediaId:'b',seconds:5},{mediaId:'a',seconds:10},{mediaId:'a',seconds:120}];
+assert.equal(stepAtTime(steps,'a',0),2);
+assert.equal(stepAtTime(steps,'a',60),0);
+assert.equal(stepAtTime(steps,'a',180),3);
+assert.equal(stepAtTime(steps,'a',15),2);
+assert.equal(stepAtTime(steps,'b',70),1);
+assert.equal(stepAtTime(steps,'missing',70),-1);
+assert.equal(stepAtTime([],'a',0),-1);
+console.log('Passed timeline selection before first step, boundaries, forward/backward seeks, unsorted sections and separate videos.');

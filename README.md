@@ -87,3 +87,13 @@ Optional concepts, troubleshooting, activities, quiz and teacher notes can be em
 Checks: `node tests/chatgpt-exchange.mjs` and `node tests/integration.mjs` (after building the Worker).
 
 Video creation accepts a URL and folder without a title; the draft uses Untitled lesson until edited or filled by AI. Preparation prompts address students directly and reserve teacher commentary for private review notes. The exchange format identifier remains unchanged for compatibility.
+
+## Digital Technologies hub: playback and administration
+
+The desktop lesson layout prioritises the video. YouTube's IFrame Player API reports playback time to the guide twice per second, including seeks using the video controls. Follow video can be switched off; Previous/Next step switches to reading mode. Chapter clicks still seek intentionally. Guide selection follows timestamp order per video, even when written sections are organised differently.
+
+Teacher dashboards can delete published or unpublished lessons. Deletion withdraws the public copy and marks the record deleted so stale editor saves cannot restore it. There is no restore UI. YouTube connection controls are currently hidden; the existing backend OAuth integration remains available for future use.
+
+Sign in as admin through the teacher login to manage accounts. The server-only ADMIN_BOOTSTRAP_HASH creates the initial admin once; an existing password is never reset by bootstrap. The admin must replace its temporary password before accessing management routes. Admins create teacher accounts (temporary passwords require 12 characters), reset passwords and delete accounts. Reset invalidates existing sessions and forces a password change. Account deletion disables login and withdraws its folders and lessons; usernames remain reserved to prevent bootstrap resurrection. The current admin cannot delete itself. These checks are enforced server-side, not just hidden in the UI.
+
+The new append-only migration adds role/deleted flags. Existing teachers keep their accounts and lessons. Local dev seeds admin with the same temporary password as the other demo accounts; production stores only its salted hash as a secret. Run tests/integration.mjs and tests/playback.mjs after building.

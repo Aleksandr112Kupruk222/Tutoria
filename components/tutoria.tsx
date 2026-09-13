@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import SyncedVideo from "./synced-video";
+import {stepAtTime} from "@/lib/playback";
 
 import { useState, useEffect, useRef, type ReactNode } from "react";
 
@@ -60,7 +62,7 @@ export function Shell({
           tutoria<span className="brand-dot">.</span>
         </Link>
         <span className="course-area">
-          {teacher ? "TEACHER WORKSPACE" : "GAMES DESIGN / LEARNING HUB"}
+          {teacher ? "TEACHER WORKSPACE" : "DIGITAL TECHNOLOGIES HUB"}
         </span>
         <nav>
           {teacher ? (
@@ -89,7 +91,7 @@ export function Shell({
         <main id="main">{children}</main>
         <footer>
           Learn. Create. Collaborate. Succeed.
-          <span>Tutoria / Games Design</span>
+          <span>Tutoria / Digital Technologies</span>
         </footer>
       </div>
     </div>
@@ -128,9 +130,9 @@ export function Library() {
   return (
     <Shell>
       <div className="page-heading">
-        <div className="eyebrow">DIGITAL TECHNOLOGIES / GAMES DESIGN</div>
+        <div className="eyebrow">DIGITAL TECHNOLOGIES</div>
         <h1>
-          Build skills. <span>Create worlds.</span>
+          Build skills. <span>Create possibilities.</span>
         </h1>
         <p>
           Your lesson videos, practical guides and challenges. All in one place.
@@ -315,6 +317,7 @@ export function LessonView({
 }) {
   const [tab, setTab] = useState("Guide"),
     [step, setStep] = useState(0),
+    [follow, setFollow] = useState(true),
     [playing, setPlaying] = useState(false),
     [seconds, setSeconds] = useState(0),
     [mediaId, setMediaId] = useState(lesson.media[0].id),
@@ -381,26 +384,15 @@ export function LessonView({
         <div className="watch-column">
           <div className="player">
             {playing ? (
-              <iframe
-                key={`${mediaId}-${revision}`}
+              <SyncedVideo videoId={video.videoId} title={video.title} seconds={seconds} requestId={revision} onTime={time=>{if(follow){const next=stepAtTime(lesson.steps,mediaId,time);setStep(next);}}}/>
 
-                title={video.title}
-
-                src={`https://www.youtube-nocookie.com/embed/${video.videoId}?start=${seconds}&autoplay=1&rel=0`}
-
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-
-                allowFullScreen
-
-                referrerPolicy="strict-origin-when-cross-origin"
-              />
             ) : (
               <button
                 className="player-cover"
 
                 onClick={() => setPlaying(true)}
 
-                aria-label="Play reference video"
+                aria-label="Play lesson video"
               >
                 <img
                   src={`https://i.ytimg.com/vi/${video.videoId}/hqdefault.jpg`}
@@ -441,6 +433,7 @@ export function LessonView({
 
               onChange={(e) => {
                 setMediaId(e.target.value);
+                setStep(stepAtTime(lesson.steps,e.target.value,0));
 
                 setSeconds(0);
 
@@ -455,6 +448,7 @@ export function LessonView({
             </select>
           )}
 
+          <label className="follow-video"><input type="checkbox" checked={follow} onChange={e=>setFollow(e.target.checked)}/> Follow video in the step guide</label>
           <div className="chapter-panel">
             <div className="chapter-title">
               <h2>In this tutorial</h2>
@@ -467,7 +461,7 @@ export function LessonView({
             <div className="progress-track">
               <div
                 style={{
-                  width: `${(done.length / lesson.steps.length) * 100}%`,
+                  width: `${(done.length / Math.max(1,lesson.steps.length)) * 100}%`,
                 }}
               />
             </div>
@@ -548,7 +542,8 @@ export function LessonView({
           </div>
 
           <div className="lesson-body" role="tabpanel" aria-label={tab}>
-            {tab === "Guide" && (
+            {tab === "Guide" && !current && <p>No guide steps are available for this video.</p>}
+            {tab === "Guide" && current && (
               <>
                 <div className="step-top">
                   <span className="eyebrow">
@@ -613,7 +608,7 @@ export function LessonView({
                   <button
                     disabled={step === 0}
 
-                    onClick={() => setStep((v) => v - 1)}
+                    onClick={() => {setFollow(false);setStep((v) => v - 1);}}
                   >
                     <ArrowLeft size={16} /> Previous
                   </button>
@@ -622,7 +617,7 @@ export function LessonView({
                     <button
                       className="primary"
 
-                      onClick={() => setStep((v) => v + 1)}
+                      onClick={() => {setFollow(false);setStep((v) => v + 1);}}
                     >
                       Next step <ArrowRight size={16} />
                     </button>

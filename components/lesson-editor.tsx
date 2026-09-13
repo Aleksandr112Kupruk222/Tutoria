@@ -339,8 +339,7 @@ export default function LessonEditor({
             <>
               <p className="editor-help">
                 Paste a YouTube URL, then manually import your own captions.
-                Automatic caption retrieval will require owner-authorised
-                YouTube access.
+                Import captions in Prepare with AI to generate your lesson guide.
               </p>
               <label>
                 YouTube URL
@@ -382,44 +381,7 @@ export default function LessonEditor({
                   }
                 />
               </label>
-              <button
-                className="secondary"
-                onClick={async () => {
-                  const id = youtubeId(url);
-                  if (!id) {
-                    notify("Enter a valid YouTube URL first.", true);
-                    return;
-                  }
-                  try {
-                    notify("Importing video and captions...");
-                    const result = await api<{
-                      title: string;
-                      description: string;
-                      transcript: Lesson["transcript"];
-                      warning: string | null;
-                    }>("/api/youtube/import", { videoId: id });
-                    update({
-                      title: result.title,
-                      media: draft.media.map((m, i) =>
-                        i === 0
-                          ? { ...m, videoId: id, title: result.title }
-                          : m,
-                      ),
-                      ...(result.transcript.length
-                        ? { transcript: result.transcript }
-                        : {}),
-                    });
-                    notify(
-                      result.warning ||
-                        "Captions imported. Build suggested steps below.",
-                    );
-                  } catch (e) {
-                    notify((e as Error).message, true);
-                  }
-                }}
-              >
-                Import from my YouTube channel
-              </button>
+
               <button className="secondary" onClick={() => setSection("Prepare with AI")}>Import captions in Prepare with AI</button>
               <button
                 className="primary"

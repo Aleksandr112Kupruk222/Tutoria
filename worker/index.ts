@@ -1,3 +1,4 @@
+import { adminApi } from "./admin";
 import { z } from "zod";
 import {
   lessonSchema,
@@ -143,7 +144,7 @@ export async function handleApi(request: Request, env: Env): Promise<Response> {
         .bind(key, now + 900000, now, now)
         .run();
       const user = await env.DB.prepare(
-        "SELECT id,password_hash FROM teachers WHERE username=?",
+        "SELECT id,password_hash FROM teachers WHERE username=? AND deleted=0",
       )
         .bind(data.username)
         .first<{ id: string; password_hash: string }>();
@@ -180,11 +181,11 @@ export async function handleApi(request: Request, env: Env): Promise<Response> {
     if (path === "/api/catalog" && request.method === "GET") {
       const folders = (
         await env.DB.prepare(
-          "SELECT f.id,f.name,f.description,f.color,t.name AS teacher FROM folders f JOIN teachers t ON t.id=f.owner_id ORDER BY f.created_at,f.id",
+          "SELECT f.id,f.name,f.description,f.color,t.name AS teacher FROM folders f JOIN teachers t ON t.id=f.owner_id WHERE t.deleted=0 ORDER BY f.created_at,f.id",
         ).all()
       ).results;
       const rows = await env.DB.prepare(
-        "SELECT id,folder_id,published_json FROM tutorials WHERE published_json IS NOT NULL ORDER BY updated_at DESC",
+        "SELECT id,folder_id,published_json FROM tutorials WHERE deleted=0 AND published_json IS NOT NULL ORDER BY updated_at DESC",
       ).all<{ id: string; folder_id: string; published_json: string }>();
       return json({
         folders,
@@ -198,7 +199,7 @@ export async function handleApi(request: Request, env: Env): Promise<Response> {
     if (path === "/api/lesson" && request.method === "GET") {
       const id = idSchema.parse(u.searchParams.get("id"));
       const row = await env.DB.prepare(
-        "SELECT published_json FROM tutorials WHERE id=? AND published_json IS NOT NULL",
+        "SELECT published_json FROM tutorials WHERE id=? AND deleted=0 AND published_json IS NOT NULL",
       )
         .bind(id)
         .first<{ published_json: string }>();
@@ -210,6 +211,7 @@ export async function handleApi(request: Request, env: Env): Promise<Response> {
       env,
       path === "/api/teacher/session" || path === "/api/auth/password",
     );
+    if (path.startsWith("/api/admin/")) return await adminApi(request, env, user);
     if (path === "/api/teacher/session" && request.method === "GET") {
       const connection = await env.DB.prepare(
         "SELECT channel_id,channel_title FROM youtube_connections WHERE teacher_id=?",
@@ -222,6 +224,7 @@ export async function handleApi(request: Request, env: Env): Promise<Response> {
           name: user.name,
           username: user.username,
           mustChange: !!user.must_change,
+          role: user.role,
         },
         youtube: { configured: youtubeReady(env), connection },
       });
@@ -240,7 +243,7 @@ export async function handleApi(request: Request, env: Env): Promise<Response> {
           "DELETE FROM sessions WHERE teacher_id=? AND token_hash<>?",
         ).bind(user.id, user.sessionHash),
       ]);
-      await initialize(env, user.id);
+      if(user.role !== "admin") await initialize(env, user.id);
       return json({ ok: true });
     }
     if (path === "/api/teacher/catalog" && request.method === "GET") {
@@ -252,7 +255,7 @@ export async function handleApi(request: Request, env: Env): Promise<Response> {
           .all()
       ).results;
       const rows = await env.DB.prepare(
-        "SELECT id,folder_id,draft_json,published_json IS NOT NULL AS published,revision,updated_at FROM tutorials WHERE owner_id=? ORDER BY updated_at DESC",
+        "SELECT id,folder_id,draft_json,published_json IS NOT NULL AS published,revision,updated_at FROM tutorials WHERE owner_id=? AND deleted=0 ORDER BY updated_at DESC",
       )
         .bind(user.id)
         .all<{
@@ -343,6 +346,12 @@ export async function handleApi(request: Request, env: Env): Promise<Response> {
         201,
       );
     }
+    if (path === "/api/teacher/lesson" && request.method === "DELETE") {
+      const id=idSchema.parse(u.searchParams.get("id"));
+      const result=await env.DB.prepare("UPDATE tutorials SET deleted=1,published_json=NULL,revision=revision+1 WHERE id=? AND owner_id=? AND deleted=0").bind(id,user.id).run();
+      if(!result.meta.changes)throw new HttpError(404,"Lesson not found.");
+      return json({ok:true});
+    }
     if (path === "/api/teacher/lesson" && request.method === "PUT") {
       const id = idSchema.parse(u.searchParams.get("id"));
       const data = z
@@ -366,8 +375,8 @@ export async function handleApi(request: Request, env: Env): Promise<Response> {
       const serialized = JSON.stringify(lesson);
       const statement =
         data.action === "save"
-          ? "UPDATE tutorials SET folder_id=?,draft_json=?,revision=revision+1,updated_at=? WHERE id=? AND owner_id=? AND revision=?"
-          : "UPDATE tutorials SET folder_id=?,draft_json=?,published_json=?,revision=revision+1,updated_at=? WHERE id=? AND owner_id=? AND revision=?";
+          ? "UPDATE tutorials SET folder_id=?,draft_json=?,revision=revision+1,updated_at=? WHERE id=? AND owner_id=? AND deleted=0 AND revision=?"
+          : "UPDATE tutorials SET folder_id=?,draft_json=?,published_json=?,revision=revision+1,updated_at=? WHERE id=? AND owner_id=? AND deleted=0 AND revision=?";
       const params =
         data.action === "save"
           ? [

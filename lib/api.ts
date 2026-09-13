@@ -18,7 +18,7 @@ export interface Catalog {
   lessons: Entry[];
 }
 export interface Session {
-  user: { id: string; name: string; username: string; mustChange: boolean };
+  user: { id: string; name: string; username: string; role: "teacher" | "admin"; mustChange: boolean };
   youtube: {
     configured: boolean;
     connection: { channel_id: string; channel_title: string } | null;

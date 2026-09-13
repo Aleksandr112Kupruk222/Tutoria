@@ -2,6 +2,7 @@ export interface Env {
   DB: D1Database;
   ASSETS: Fetcher;
   BOOTSTRAP_ACCOUNTS?: string;
+  ADMIN_BOOTSTRAP_HASH?: string;
   GOOGLE_CLIENT_ID?: string;
   GOOGLE_CLIENT_SECRET?: string;
   TOKEN_ENCRYPTION_KEY?: string;
@@ -81,6 +82,7 @@ export interface Teacher {
   name: string;
   must_change: number;
   sessionHash: string;
+  role: "teacher" | "admin";
 }
 export function cookieToken(r: Request) {
   return (
@@ -131,7 +133,7 @@ export async function requireTeacher(
     throw new HttpError(401, "Please log in to your teacher account.");
   const sessionHash = await sha(token);
   const user = await env.DB.prepare(
-    "SELECT t.id,t.username,t.name,t.must_change FROM sessions s JOIN teachers t ON t.id=s.teacher_id WHERE s.token_hash=? AND s.expires>?",
+    "SELECT t.id,t.username,t.name,t.must_change,t.role FROM sessions s JOIN teachers t ON t.id=s.teacher_id WHERE s.token_hash=? AND s.expires>? AND t.deleted=0",
   )
     .bind(sessionHash, Date.now())
     .first<Omit<Teacher, "sessionHash">>();
@@ -145,6 +147,7 @@ export async function requireTeacher(
   return { ...user, sessionHash };
 }
 export async function bootstrap(env: Env) {
+  if (env.ADMIN_BOOTSTRAP_HASH) await env.DB.prepare("INSERT OR IGNORE INTO teachers (id,username,name,password_hash,must_change,created_at,role) VALUES ('admin','admin','Administrator',?,1,?,'admin')").bind(env.ADMIN_BOOTSTRAP_HASH,new Date().toISOString()).run();
   if (!env.BOOTSTRAP_ACCOUNTS) return;
   const accounts = JSON.parse(env.BOOTSTRAP_ACCOUNTS) as {
     id: string;

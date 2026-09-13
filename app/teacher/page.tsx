@@ -1,4 +1,5 @@
 "use client";
+import AdminPanel from "@/components/admin-panel";
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Shell } from "@/components/tutoria";
@@ -40,12 +41,13 @@ export default function Teacher() {
     [title, setTitle] = useState(""),
     [url, setUrl] = useState(""),
     [targetFolder, setTargetFolder] = useState(""),
+    [deleting, setDeleting] = useState<Entry | null>(null),
     [editing, setEditing] = useState<Entry | null>(null),
     [password, setPassword] = useState(""), [transcriptText,setTranscriptText]=useState("");
   const refresh = async () => {
     const s = await api<Session>("/api/teacher/session");
     setSession(s);
-    if (!s.user.mustChange) {
+    if (!s.user.mustChange && s.user.role !== "admin") {
       const c = await api<Catalog>("/api/teacher/catalog");
       setCatalog(c);
       setTargetFolder((v) => v || c.folders[0]?.id || "");
@@ -105,8 +107,7 @@ export default function Teacher() {
           <div className="eyebrow">WELCOME, {session.user.name}</div>
           <h1>Make this account yours.</h1>
           <p>
-            Replace the temporary password before adding lessons or connecting
-            your YouTube channel.
+            Replace the temporary password before opening your workspace.
           </p>
           <label>
             New password — at least 12 characters
@@ -131,6 +132,7 @@ export default function Teacher() {
         </form>
       </Shell>
     );
+  if (session.user.role === "admin") return <AdminPanel session={session}/>;
   if (editing)
     return (
       <LessonEditor
@@ -200,56 +202,7 @@ export default function Teacher() {
           {notice}
         </div>
       )}
-      <section className="youtube-panel">
-        <Video size={29} />
-        <div>
-          <h3>
-            {session.youtube.connection
-              ? session.youtube.connection.channel_title
-              : "Connect your YouTube channel"}
-          </h3>
-          <p>
-            {session.youtube.connection
-              ? "Connected to your teacher account. Import captions from videos you can edit."
-              : session.youtube.configured
-                ? "Connect your own channel to import video details and available captions."
-                : "Google OAuth setup is needed for channel connections. Manual transcript import is ready to use."}
-          </p>
-        </div>
-        {session.youtube.connection ? (
-          <Button
-            className="secondary"
-            disabled={busy}
-            onClick={() =>
-              void run(async () => {
-                const r = await api<{ warning?: string }>(
-                  "/api/youtube/disconnect",
-                  {},
-                );
-                await refresh();
-                setNotice(
-                  r.warning || "YouTube disconnected from your account.",
-                );
-              })
-            }
-          >
-            Disconnect
-          </Button>
-        ) : (
-          <Button
-            className="secondary"
-            disabled={busy || !session.youtube.configured}
-            onClick={() =>
-              void run(async () => {
-                const r = await api<{ url: string }>("/api/youtube/start", {});
-                window.location.assign(r.url);
-              })
-            }
-          >
-            Connect YouTube <ExternalLink size={15} />
-          </Button>
-        )}
-      </section>
+
       {view === "folder" && (
         <form
           className="dashboard-form"
@@ -323,13 +276,13 @@ export default function Teacher() {
             void run(async () => {
               const videoId = youtubeId(url);
               if (!videoId) throw Error("Paste a valid HTTPS YouTube link.");
-              let imported:{title:string;description:string;transcript:Lesson['transcript'];warning:string|null}|null=null;
-              if(session.youtube.connection&&!transcriptText.trim()) imported=await api('/api/youtube/import',{videoId});
-              const lessonTitle=title.trim()||imported?.title||'';
+
+
+              const lessonTitle=title.trim()||'';
               const r = await api<{entry:Entry}>('/api/teacher/lessons',{title:lessonTitle,videoId,folderId:targetFolder});
               let entry=r.entry;
-              const transcript=transcriptText.trim()?parseTranscript(transcriptText,'screen'):imported?.transcript||[];
-              if(transcript.length){const generated=buildTranscriptDraft({...entry.lesson,transcript},imported?.description||'');
+              const transcript=transcriptText.trim()?parseTranscript(transcriptText,'screen'):[];
+              if(transcript.length){const generated=buildTranscriptDraft({...entry.lesson,transcript},'');
                 try{const saved=await api<{revision:number}>(`/api/teacher/lesson?id=${entry.id}`,{lesson:generated.lesson,folderId:entry.folderId,revision:entry.revision,action:'save'},'PUT');entry={...entry,lesson:generated.lesson,revision:saved.revision};}catch{entry={...entry,lesson:generated.lesson};}
               }
               setEditing(entry);
@@ -340,7 +293,7 @@ export default function Teacher() {
           <div className="eyebrow">START A NEW LESSON</div>
           <h2>Add your video</h2>
           <p>
-            Paste your video link. Connected captions or a pasted transcript become an editable draft using rules, with no AI calls.
+            Paste your video link and choose a folder. You can add captions now or later in Prepare with AI.
           </p>
           <label>
             YouTube URL
@@ -379,7 +332,7 @@ export default function Teacher() {
               </select>
             </label>
           </div>
-          <label>Transcript (optional fallback)<Textarea value={transcriptText} onChange={e=>setTranscriptText(e.target.value)} placeholder="Paste timed captions here if your channel is not connected."/></label>
+          <label>Transcript (optional fallback)<Textarea value={transcriptText} onChange={e=>setTranscriptText(e.target.value)} placeholder="Paste timed captions here to start your draft."/></label>
           <div className="form-actions">
             <Button className="primary" type="submit" disabled={busy}>
               {busy?'Building draft…':'Create draft'} <ArrowRight size={17} />
@@ -458,6 +411,7 @@ export default function Teacher() {
           </button>
         )}
       </div>
+      {deleting && <section className="exchange-stage"><h2>Delete {deleting.lesson.title}?</h2><p>This removes the lesson from your dashboard and student view, including any published version.</p><div className="editor-actions"><Button disabled={busy} className="primary" onClick={()=>void run(async()=>{await api(`/api/teacher/lesson?id=${deleting.id}`,{},"DELETE");setDeleting(null);await refresh();setNotice("Lesson deleted.");})}>Delete lesson</Button><Button className="secondary" onClick={()=>setDeleting(null)}>Cancel</Button></div></section>}
       <div className="lesson-table">
         {filtered.map((e) => (
           <div className="lesson-row" key={e.id}>
@@ -503,6 +457,7 @@ export default function Teacher() {
               </select>
             </label>
             <div className="row-actions">
+              <Button className="secondary" disabled={busy} onClick={()=>setDeleting(e)}>Delete</Button>
               <Button className="secondary" onClick={() => setEditing(e)}>
                 Edit content
               </Button>

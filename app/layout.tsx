@@ -2,17 +2,17 @@ import type { Metadata } from "next";
 import "./globals.css";
 export const metadata: Metadata = {
   metadataBase: new URL("https://tutoria-game-lab-aleks.akupruk.chatgpt.site"),
-  title: "Tutoria — Games Design Learning Hub",
+  title: "Tutoria — Digital Technologies Hub",
   description:
-    "Lesson folders, practical video guides and teacher-created learning resources for games design.",
+    "Lesson folders, practical video guides and teacher-created learning resources for computing, games design and digital technologies.",
   openGraph: {
-    title: "Tutoria — Games Design Learning Hub",
+    title: "Tutoria — Digital Technologies Hub",
     description:
       "Learn, create, collaborate and succeed. Video lessons with clear written steps.",
   },
   twitter: {
     card: "summary",
-    title: "Tutoria — Games Design Learning Hub",
+    title: "Tutoria — Digital Technologies Hub",
     description: "Video lessons with clear written steps.",
   },
   icons: { icon: "/favicon.svg" },

@@ -25,6 +25,7 @@ const mf = new Miniflare({
   d1Persist: ".wrangler/tutoria",
   bindings: {
     BOOTSTRAP_ACCOUNTS: JSON.stringify(accounts),
+    ADMIN_BOOTSTRAP_HASH: accounts[0].hash,
     APP_ORIGIN: "http://localhost:3001",
   },
   serviceBindings: {

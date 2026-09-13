@@ -11,6 +11,8 @@ export const teachers = sqliteTable(
     id: text("id").primaryKey(),
     username: text("username").notNull(),
     name: text("name").notNull(),
+    role: text("role").notNull().default("teacher"),
+    deleted: integer("deleted").notNull().default(0),
     passwordHash: text("password_hash").notNull(),
     mustChange: integer("must_change").notNull().default(1),
     createdAt: text("created_at").notNull(),
@@ -57,6 +59,7 @@ export const tutorials = sqliteTable(
     folderId: text("folder_id")
       .notNull()
       .references(() => folders.id),
+    deleted: integer("deleted").notNull().default(0),
     draftJson: text("draft_json").notNull(),
     publishedJson: text("published_json"),
     revision: integer("revision").notNull().default(1),
