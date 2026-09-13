@@ -432,7 +432,7 @@ export default function Teacher() {
         <h2>
           {folderId
             ? folders.find((f) => f.id === folderId)?.name
-            : "All your lessons"}
+            : "All lessons"}
         </h2>
         {folderId && (
           <button className="secondary" onClick={() => openFolder("")}>
@@ -441,10 +441,10 @@ export default function Teacher() {
         )}
       </div>
       {folderId !== "unassigned" && <Button className="secondary" disabled={busy} onClick={()=>setDeletingFolder(true)}>Delete folder</Button>}
-      {folderId === "unassigned" && <p className="status">Only teachers can see this folder. Move your lessons to a shared folder before publishing.</p>}
+      {folderId === "unassigned" && <p className="status">Only teachers can see this folder. Move lessons to a shared folder before publishing.</p>}
       {deletingFolder && <section className="exchange-stage"><h2>Delete this shared folder?</h2><p>Lessons from every teacher will be moved to Unassigned and returned to drafts. No videos or lesson content will be deleted.</p><div className="editor-actions"><Button className="primary" disabled={busy} onClick={()=>void run(async()=>{await api(`/api/teacher/folder?id=${encodeURIComponent(folderId)}`,{},"DELETE");await refresh();openFolder("unassigned");setNotice("Folder deleted. Lessons are safely stored in Unassigned as drafts.");})}>Delete folder and keep lessons</Button><Button className="secondary" disabled={busy} onClick={()=>setDeletingFolder(false)}>Cancel</Button></div></section>}
       {deleting && <section className="exchange-stage"><h2>Delete {deleting.lesson.title}?</h2><p>This removes the lesson from your dashboard and student view, including any published version.</p><div className="editor-actions"><Button disabled={busy} className="primary" onClick={()=>void run(async()=>{await api(`/api/teacher/lesson?id=${deleting.id}`,{},"DELETE");setDeleting(null);await refresh();setNotice("Lesson deleted.");})}>Delete lesson</Button><Button className="secondary" onClick={()=>setDeleting(null)}>Cancel</Button></div></section>}
-      <p className="editor-help">You are viewing your lessons in this shared folder. Drag the grip on a lesson to reorder it. You can also use Move up and Move down. New videos are added at the end.</p>
+      <p className="editor-help">All teachers can manage every lesson in this folder. Drag the grip on a lesson to reorder it. You can also use Move up and Move down. New videos are added at the end.</p>
       <div className="lesson-table">
         {filtered.map((e) => (
           <div className={`lesson-row draggable-lesson ${dragId===e.id?"is-dragging":""} ${dropId===e.id?"drop-target":""}`} key={e.id}

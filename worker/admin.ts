@@ -25,7 +25,6 @@ export async function adminApi(request:Request,env:Env,user:Teacher){
       env.DB.prepare("DELETE FROM sessions WHERE teacher_id=?").bind(id),
       env.DB.prepare("DELETE FROM oauth_states WHERE teacher_id=?").bind(id),
       env.DB.prepare("DELETE FROM youtube_connections WHERE teacher_id=?").bind(id),
-      env.DB.prepare("UPDATE tutorials SET deleted=1,published_json=NULL,revision=revision+1 WHERE owner_id=?").bind(id),
     ]);return json({ok:true});
   }
   throw new HttpError(404,"Not found.");

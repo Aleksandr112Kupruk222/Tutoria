@@ -136,7 +136,7 @@ try {
     await request("/api/teacher/catalog", undefined, ac)
   ).json();
   assert.equal(cat.folders.length, 3);
-  assert.equal(cat.lessons.length, 1);
+  assert.equal(cat.lessons.length, 2);
   const badFolder = await request(
     "/api/teacher/folder?id=" + cat.folders[0].id,
     { name: "Intrusion", description: "", color: "cyan" },
@@ -154,11 +154,6 @@ try {
     action: "publish",
   };
   assert.equal(
-    (await request("/api/teacher/lesson?id=" + own.id, payload, bc, "PUT"))
-      .status,
-    409,
-  );
-  assert.equal(
     (
       await request(
         "/api/teacher/lesson?id=" + own.id,
@@ -175,7 +170,7 @@ try {
     0,
   );
   assert.equal(
-    (await request("/api/teacher/lesson?id=" + own.id, payload, ac, "PUT"))
+    (await request("/api/teacher/lesson?id=" + own.id, payload, bc, "PUT"))
       .status,
     200,
   );
@@ -214,7 +209,7 @@ try {
   assert.equal((await request("/api/youtube/start", {}, ac)).status, 503);
   const ordering=(await (await request("/api/teacher/catalog",undefined,ac)).json()).lessons.filter(l=>l.folderId===own.folderId);
   const reversed=ordering.map(l=>l.id).reverse();
-  assert.equal((await request("/api/teacher/order",{folderId:own.folderId,ids:reversed},bc,"PUT")).status,409);
+  assert.equal((await request("/api/teacher/order",{folderId:own.folderId,ids:reversed},bc,"PUT")).status,200);
   assert.equal((await request("/api/teacher/order",{folderId:own.folderId,ids:[reversed[0],reversed[0]]},ac,"PUT")).status,400);
   assert.equal((await request("/api/teacher/order",{folderId:own.folderId,ids:reversed.slice(1)},ac,"PUT")).status,409);
   assert.equal((await request("/api/teacher/order",{folderId:own.folderId,ids:reversed},ac,"PUT","https://attacker.test")).status,403);
@@ -223,7 +218,7 @@ try {
   const appended=await request("/api/teacher/lessons",{videoId:own.lesson.media[0].videoId,folderId:own.folderId},ac);
   const appendedId=(await appended.json()).entry.id;
   assert.equal((await (await request("/api/teacher/catalog",undefined,ac)).json()).lessons.filter(l=>l.folderId===own.folderId).at(-1).id,appendedId);
-  console.log("Passed folder ordering, duplicate/stale/foreign ID rejection, CSRF and append-at-end creation.");
+  console.log("Passed folder ordering, duplicate/stale ID rejection, CSRF and append-at-end creation.");
   assert.equal((await request("/api/admin/accounts",undefined,ac)).status,403);
   const adminLogin=await request("/api/auth/login",{username:"admin",password:"1234"});
   const adminCookie=adminLogin.headers.get("set-cookie").split(";")[0];
@@ -238,7 +233,7 @@ try {
   assert.equal((await request("/api/auth/password",{password:"eight123"},newCookie)).status,400);
   assert.equal((await request("/api/auth/password",{password:"longer-new-password"},newCookie)).status,200);
   assert.equal((await (await request("/api/teacher/catalog",undefined,newCookie)).json()).folders.length,3);
-  assert.equal((await (await request("/api/teacher/catalog",undefined,newCookie)).json()).lessons.length,0);
+  assert.deepEqual((await (await request("/api/teacher/catalog",undefined,newCookie)).json()).lessons,(await (await request("/api/teacher/catalog",undefined,ac)).json()).lessons);
   const teacherList=(await (await request("/api/admin/accounts",undefined,adminCookie)).json()).accounts;
   const newId=teacherList.find(t=>t.username==="computing").id;
   assert.equal((await request("/api/admin/password?id="+newId,{password:"replacement-password"},adminCookie)).status,200);
@@ -266,30 +261,31 @@ try {
   assert(!publicCatalog.folders.some(f=>f.id==="unassigned"||f.id===sharedFolder.id));
   assert(publicCatalog.folders.every(f=>f.teacher===undefined));
   assert(!publicCatalog.lessons.some(l=>l.id===sharedLesson.id));
-  assert.equal((await request("/api/teacher/lesson?id="+sharedLesson.id,{lesson:validShared,folderId:"unassigned",revision:3,action:"publish"},ac,"PUT")).status,400);
+  assert.equal((await request("/api/teacher/lesson?id="+sharedLesson.id,{lesson:validShared,folderId:"unassigned",revision:3,action:"publish"},bc,"PUT")).status,400);
   assert.equal((await request("/api/teacher/lesson?id="+sharedLesson.id,{lesson:validShared,folderId:own.folderId,revision:2,action:"save"},ac,"PUT")).status,409);
-  assert.equal((await request("/api/teacher/lesson?id="+sharedLesson.id,{lesson:validShared,folderId:own.folderId,revision:3,action:"publish"},ac,"PUT")).status,200);
+  assert.equal((await request("/api/teacher/lesson?id="+sharedLesson.id,{lesson:validShared,folderId:own.folderId,revision:3,action:"publish"},bc,"PUT")).status,200);
   assert.equal((await request("/api/lesson?id="+sharedLesson.id)).status,200);
   const retained=(await (await request("/api/teacher/folders",{name:"Retained shared folder",description:"",color:"cyan"},bc)).json()).folder;
   console.log("Passed shared folders, legacy consolidation, lossless deletion, hidden Unassigned, republishing and 8/12-character passwords.");
-  assert.equal((await request("/api/teacher/lesson?id="+own.id,{},bc,"DELETE")).status,404);
   assert.equal((await request("/api/teacher/lesson?id="+own.id,{},ac,"DELETE","https://attacker.test")).status,403);
-  assert.equal((await request("/api/teacher/lesson?id="+own.id,{},ac,"DELETE")).status,200);
+  assert.equal((await request("/api/teacher/lesson?id="+own.id,{},bc,"DELETE")).status,200);
   assert.equal((await request("/api/lesson?id="+own.id)).status,404);
   assert.equal((await request("/api/teacher/lesson?id="+own.id,{...payload,revision:3},ac,"PUT")).status,409);
+  const beforeRemoval=(await (await request("/api/teacher/catalog",undefined,ac)).json()).lessons;
   assert.equal((await request("/api/admin/account?id=ben",{},adminCookie,"DELETE")).status,200);
+  assert.deepEqual((await (await request("/api/teacher/catalog",undefined,ac)).json()).lessons,beforeRemoval);
   assert.equal((await request("/api/teacher/session",undefined,bc)).status,401);
   assert.equal((await request("/api/auth/login",{username:"ben",password:"1234"})).status,401);
   assert.equal((await db.prepare("SELECT deleted FROM teachers WHERE id='ben'").first()).deleted,1);
   assert((await (await request("/api/catalog")).json()).folders.some(f=>f.id===retained.id));
-  console.log("Passed admin role isolation, required first password change, account creation/reset/deletion, session revocation, no bootstrap resurrection and owner-only lesson deletion.");
+  console.log("Passed admin role isolation, required first password change, account creation/reset/deletion, session revocation, no bootstrap resurrection and collaborative lesson deletion and content preservation.");
   assert.equal((await request("/api/auth/logout", {}, ac)).status, 200);
   assert.equal(
     (await request("/api/teacher/catalog", undefined, ac)).status,
     401,
   );
   console.log(
-    "Passed: transcript extraction, correction flags, glossary, password login/change, cookies, ownership isolation, CSRF, draft/publish separation, stale writes, unconfigured OAuth and logout.",
+    "Passed: transcript extraction, correction flags, glossary, password login/change, cookies, shared teacher access, CSRF, draft/publish separation, stale writes, unconfigured OAuth and logout.",
   );
 } finally {
   await mf.dispose();
