@@ -1,0 +1,210 @@
+{
+  "schemaVersion": 1,
+  "id": "godot-movement",
+  "slug": "your-first-player-controller",
+  "title": "Your first player controller",
+  "description": "Bring your character to life. Build responsive 2D movement with input actions, velocity and collision in Godot 4.",
+  "module": "2D game development",
+  "difficulty": "Beginner",
+  "durationMinutes": 35,
+  "tags": [
+    "Godot 4",
+    "GDScript",
+    "Player movement"
+  ],
+  "sample": true,
+  "media": [
+    {
+      "id": "screen",
+      "role": "tutorial",
+      "provider": "youtube",
+      "videoId": "GwCiGixlqiU",
+      "title": "Reference video by GDQuest (sample playback)"
+    }
+  ],
+  "objectives": [
+    "Create a reusable CharacterBody2D player scene.",
+    "Map keyboard input to a normalised movement vector.",
+    "Move a character with collision-aware physics.",
+    "Diagnose movement problems using a repeatable test."
+  ],
+  "steps": [
+    {
+      "id": "scene",
+      "title": "Set up your player scene",
+      "mediaId": "screen",
+      "seconds": 0,
+      "body": "Create a new 2D scene in Godot 4. Add a CharacterBody2D root and rename it Player. Add a Sprite2D child and assign a texture. Add a CollisionShape2D child, choose a RectangleShape2D, and resize it to fit the sprite. Save the scene as player.tscn.",
+      "check": "The Player scene contains a sprite and collision shape, with no configuration warnings."
+    },
+    {
+      "id": "input",
+      "title": "Define your input actions",
+      "mediaId": "screen",
+      "seconds": 120,
+      "body": "Open Project → Project Settings → Input Map. Add move_left, move_right, move_up and move_down. Assign A / Left, D / Right, W / Up and S / Down respectively. Action names are case-sensitive; use these exact names in your script.",
+      "check": "Each action has a WASD key and its matching arrow key."
+    },
+    {
+      "id": "movement",
+      "title": "Write the movement script",
+      "mediaId": "screen",
+      "seconds": 300,
+      "body": "Attach a new GDScript to Player. Read the four actions in _physics_process. Input.get_vector limits the vector length, so diagonal movement stays the same speed. Set velocity, then call move_and_slide to apply collision-aware movement.",
+      "code": "extends CharacterBody2D\n\n@export var speed: float = 200.0\n\nfunc _physics_process(_delta: float) -> void:\n    var direction = Input.get_vector(\n        \"move_left\", \"move_right\",\n        \"move_up\", \"move_down\"\n    )\n    velocity = direction * speed\n    move_and_slide()",
+      "check": "Your script has no parser errors. Do not multiply velocity by delta; move_and_slide handles the time step."
+    },
+    {
+      "id": "world",
+      "title": "Build a small test space",
+      "mediaId": "screen",
+      "seconds": 540,
+      "body": "Create a Node2D scene called World and instance player.tscn into it. Add a StaticBody2D wall with a CollisionShape2D rectangle. Position the wall near the player and ensure both use compatible collision layers and masks. Run World using F6.",
+      "check": "The player appears in the running scene and cannot pass through the wall."
+    },
+    {
+      "id": "test",
+      "title": "Test and tune the feel",
+      "mediaId": "screen",
+      "seconds": 720,
+      "body": "Move horizontally, vertically and diagonally with both key sets. Release all keys and confirm the player stops. Push into the wall and try moving along it. Adjust the exported speed in the Inspector and repeat the same tests. Record one change and how it affects control.",
+      "check": "Movement speed is consistent in every direction, and the player slides along the wall."
+    },
+    {
+      "id": "reflect",
+      "title": "Save and reflect",
+      "mediaId": "screen",
+      "seconds": 900,
+      "body": "Save all scenes and scripts. Explain to a partner the difference between an input action, a direction vector and velocity. Describe why movement runs in the physics callback. Keep this player scene to reuse in your next project.",
+      "check": "You can explain how a key press becomes movement, and your project runs after reopening."
+    }
+  ],
+  "transcript": [
+    {
+      "seconds": 0,
+      "mediaId": "screen",
+      "text": "Sample transcript: start with a CharacterBody2D player. Add a sprite and collision shape, then save the scene."
+    },
+    {
+      "seconds": 120,
+      "mediaId": "screen",
+      "text": "Create four named input actions and bind WASD and the arrow keys."
+    },
+    {
+      "seconds": 300,
+      "mediaId": "screen",
+      "text": "Read direction using Input.get_vector. Multiply by speed to set velocity, then call move_and_slide."
+    },
+    {
+      "seconds": 540,
+      "mediaId": "screen",
+      "text": "Instance the player into a world scene. Add a static wall and check the collision setup."
+    },
+    {
+      "seconds": 720,
+      "mediaId": "screen",
+      "text": "Test diagonal movement and sliding along walls. Adjust speed and compare the feel."
+    },
+    {
+      "seconds": 900,
+      "mediaId": "screen",
+      "text": "Save the project and explain how input, direction and velocity work together."
+    }
+  ],
+  "concepts": [
+    {
+      "term": "CharacterBody2D",
+      "definition": "A physics body controlled by your script, with collision-aware movement helpers."
+    },
+    {
+      "term": "Vector2",
+      "definition": "A pair of values representing position, direction or velocity in two dimensions."
+    },
+    {
+      "term": "Input action",
+      "definition": "A named control that maps physical inputs to a game behaviour."
+    },
+    {
+      "term": "Velocity",
+      "definition": "Direction and speed together, measured here in pixels per second."
+    }
+  ],
+  "troubleshooting": [
+    {
+      "problem": "My character does not move",
+      "solution": "Check action names match exactly. Confirm the script is attached to the instanced Player and the game window has keyboard focus."
+    },
+    {
+      "problem": "My character passes through walls",
+      "solution": "Give both bodies enabled collision shapes. Confirm the player mask includes the wall layer. Move with move_and_slide, rather than changing position directly."
+    },
+    {
+      "problem": "Movement is extremely slow",
+      "solution": "Do not multiply velocity by delta before move_and_slide. Check the speed on the scene instance; Inspector overrides can differ from script defaults."
+    }
+  ],
+  "extensions": [
+    {
+      "level": "Beginner",
+      "title": "Find your movement style",
+      "body": "Try speeds of 100, 200 and 400. Build an obstacle course and explain which speed gives you the most control."
+    },
+    {
+      "level": "Intermediate",
+      "title": "Add a sprint action",
+      "body": "Add a sprint action. Increase speed while it is held and restore the original speed on release. Test diagonal movement while sprinting."
+    },
+    {
+      "level": "Advanced",
+      "title": "Smooth out the movement",
+      "body": "Add acceleration and deceleration using move_toward on velocity. Compare instant stopping with gradual stopping, and justify which suits your game."
+    }
+  ],
+  "quiz": [
+    {
+      "id": "vector",
+      "question": "Why use Input.get_vector for four-direction movement?",
+      "options": [
+        "It creates a collision shape.",
+        "It limits diagonal input to a vector length of one.",
+        "It automatically animates the sprite."
+      ],
+      "answer": 1,
+      "explanation": "The vector length is limited to one, so diagonal movement is not faster than movement along a single axis."
+    },
+    {
+      "id": "physics",
+      "question": "What should you pass to move_and_slide in Godot 4?",
+      "options": [
+        "The direction vector.",
+        "Velocity multiplied by delta.",
+        "No arguments; it uses the body’s velocity."
+      ],
+      "answer": 2,
+      "explanation": "Set CharacterBody2D.velocity first. move_and_slide uses that property and handles the time step."
+    },
+    {
+      "id": "collision",
+      "question": "Which setup makes a stationary solid wall?",
+      "options": [
+        "StaticBody2D with a CollisionShape2D.",
+        "Sprite2D alone.",
+        "A Node2D renamed Wall."
+      ],
+      "answer": 0,
+      "explanation": "A physics body with an enabled shape participates in collisions. A sprite alone only draws an image."
+    }
+  ],
+  "resources": [
+    {
+      "title": "Godot: your first 2D game",
+      "url": "https://docs.godotengine.org/en/stable/getting_started/first_2d_game/index.html",
+      "description": "Official walkthrough of scenes, player movement and game structure."
+    },
+    {
+      "title": "CharacterBody2D reference",
+      "url": "https://docs.godotengine.org/en/stable/classes/class_characterbody2d.html",
+      "description": "Explore velocity, collision behaviour and move_and_slide."
+    }
+  ]
+}
