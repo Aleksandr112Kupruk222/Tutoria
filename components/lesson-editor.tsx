@@ -14,7 +14,7 @@ import { buildTranscriptDraft } from "@/lib/draft-builder";
 import { api } from "@/lib/api";
 import ChatgptExchange from "@/components/chatgpt-exchange";
 const sections = [
-  "Prepare with ChatGPT",
+  "Prepare with AI",
   "Overview",
   "Video & transcript",
   "Learning objectives",
@@ -218,14 +218,14 @@ export default function LessonEditor({
         </aside>
         <div className="editor-form">
           <h2>{section}</h2>
-          {section === "Prepare with ChatGPT" && <ChatgptExchange lesson={draft} onApply={setDraft} />}
+          {section === "Prepare with AI" && <ChatgptExchange lesson={draft} onApply={setDraft} />}
 
           {section === "Overview" && (
             <>
               <p className="editor-help">
                 Set the lesson details students will see in their folder.
               </p>
-              <button className="secondary" onClick={() => setSection("Prepare with ChatGPT")}>Prepare with ChatGPT</button>
+              <button className="secondary" onClick={() => setSection("Prepare with AI")}>Prepare with AI</button>
               <label>
                 Teacher review notes (saved privately with your draft)
                 <textarea rows={5} value={(draft.teacherReviewNotes || []).join("\n")} onChange={e => update({teacherReviewNotes:e.target.value.split("\n")})} />
@@ -420,55 +420,7 @@ export default function LessonEditor({
               >
                 Import from my YouTube channel
               </button>
-              <label>
-                Paste transcript or captions
-                <textarea
-                  className="long-text"
-                  value={raw}
-                  onChange={(e) => setRaw(e.target.value)}
-                  placeholder={
-                    "00:00 Introduction\n02:00 Define the input actions\n\nPlain text, SRT and WebVTT are supported."
-                  }
-                />
-              </label>
-              <label className="secondary file-label">
-                <Upload size={15} /> Load .txt / .srt / .vtt
-                <input
-                  className="file-input"
-                  type="file"
-                  accept=".txt,.srt,.vtt"
-                  onChange={async (e) => {
-                    const f = e.target.files?.[0];
-                    if (f) {
-                      if (f.size > 2_000_000) {
-                        notify("Use a transcript smaller than 2 MB.", true);
-                        return;
-                      }
-                      setRaw(await f.text());
-                      notify(
-                        "Caption file loaded. Review the text, then import it.",
-                      );
-                    }
-                    e.target.value = "";
-                  }}
-                />
-              </label>
-              <button
-                className="primary"
-                onClick={() => {
-                  try {
-                    const transcript = parseTranscript(raw, draft.media[0].id);
-                    update({ transcript });
-                    notify(
-                      `Imported ${transcript.length} transcript segments. Review timings and manually edit the guide; Use Build suggested steps to organise the transcript.`,
-                    );
-                  } catch (e) {
-                    notify((e as Error).message, true);
-                  }
-                }}
-              >
-                Import transcript
-              </button>
+              <button className="secondary" onClick={() => setSection("Prepare with AI")}>Import captions in Prepare with AI</button>
               <button
                 className="primary"
                 onClick={() => {

@@ -78,10 +78,12 @@ Production compilation and TypeScript are checked. Integration tests cover actio
 
 ## Prepare a lesson with your own ChatGPT
 
-In the teacher editor, open **Prepare with ChatGPT**. Import the video's SRT/VTT first, then download the preparation pack. It contains a reusable prompt, the `tutoria-chatgpt-v1` template and that video's timestamped source captions. Upload it yourself to ChatGPT and request the completed JSON file. Tutoria makes no AI API calls.
+In the teacher editor, open **Prepare with AI**. Import the video's SRT/VTT in that same tab, then download the preparation pack. It contains a reusable prompt, the `tutoria-chatgpt-v1` template and that video's timestamped source captions. Upload it yourself to your AI assistant (for example ChatGPT or Claude) and request the completed JSON file. Tutoria makes no AI API calls.
 
 Return the file to the same editor panel or paste its JSON. Validation checks required fields, video identity, exact source-caption start times, quiz answer indices and size. Preview the sections and steps, apply to the editor, save as a draft and review before publishing. Import keeps the selected lesson ID, folder, video, original transcript and resources. Section titles become prefixes on student step titles. Teacher notes persist in draft JSON and are omitted from published JSON.
 
 Optional concepts, troubleshooting, activities, quiz and teacher notes can be empty arrays. Templates and instructions are generated together in `lib/chatgpt-exchange.ts`; change the format version if introducing an incompatible exchange shape. The existing full-lesson backup importer remains separate.
 
 Checks: `node tests/chatgpt-exchange.mjs` and `node tests/integration.mjs` (after building the Worker).
+
+Video creation accepts a URL and folder without a title; the draft uses Untitled lesson until edited or filled by AI. Preparation prompts address students directly and reserve teacher commentary for private review notes. The exchange format identifier remains unchanged for compatibility.

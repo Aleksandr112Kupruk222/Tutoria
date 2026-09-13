@@ -306,7 +306,7 @@ export async function handleApi(request: Request, env: Env): Promise<Response> {
     if (path === "/api/teacher/lessons" && request.method === "POST") {
       const data = z
         .object({
-          title: z.string().trim().min(1).max(160),
+          title: z.string().trim().max(160).optional(),
           videoId: z.string().regex(/^[\w-]{11}$/),
           folderId: idSchema,
         })
@@ -318,7 +318,7 @@ export async function handleApi(request: Request, env: Env): Promise<Response> {
         .first<{ name: string }>();
       if (!folder) throw new HttpError(400, "Choose one of your folders.");
       const id = random().slice(0, 24),
-        lesson = blankLesson(data.title, data.videoId, id, folder.name);
+        lesson = blankLesson(data.title || "Untitled lesson", data.videoId, id, folder.name);
       await env.DB.prepare(
         "INSERT INTO tutorials (id,owner_id,folder_id,draft_json,revision,updated_at) VALUES (?,?,?,?,1,?)",
       )

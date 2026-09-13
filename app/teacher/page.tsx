@@ -325,8 +325,7 @@ export default function Teacher() {
               if (!videoId) throw Error("Paste a valid HTTPS YouTube link.");
               let imported:{title:string;description:string;transcript:Lesson['transcript'];warning:string|null}|null=null;
               if(session.youtube.connection&&!transcriptText.trim()) imported=await api('/api/youtube/import',{videoId});
-              const lessonTitle=title.trim()||imported?.title;
-              if(!lessonTitle)throw Error('Enter a lesson title when importing manually.');
+              const lessonTitle=title.trim()||imported?.title||'';
               const r = await api<{entry:Entry}>('/api/teacher/lessons',{title:lessonTitle,videoId,folderId:targetFolder});
               let entry=r.entry;
               const transcript=transcriptText.trim()?parseTranscript(transcriptText,'screen'):imported?.transcript||[];
@@ -355,9 +354,8 @@ export default function Teacher() {
           </label>
           <div className="two-fields">
             <label>
-              Lesson title (optional with a connected channel)
+              Lesson title (optional — add it later)
               <Input
-                required={!session.youtube.connection}
                 maxLength={160}
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}

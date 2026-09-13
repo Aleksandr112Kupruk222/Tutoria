@@ -193,6 +193,11 @@ try {
     (await (await request("/api/lesson?id=" + own.id)).json()).lesson.title,
     own.lesson.title,
   );
+  for (const title of [undefined, ""]) {
+    const created = await request("/api/teacher/lessons", {title,videoId:own.lesson.media[0].videoId,folderId:own.folderId}, ac);
+    assert.equal(created.status, 201);
+    assert.equal((await created.json()).entry.lesson.title, "Untitled lesson");
+  }
   assert.equal((await request("/api/youtube/start", {}, ac)).status, 503);
   assert.equal((await request("/api/auth/logout", {}, ac)).status, 200);
   assert.equal(
