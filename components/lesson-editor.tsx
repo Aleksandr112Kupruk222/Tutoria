@@ -12,7 +12,9 @@ import {
 import { Download, Eye, Save, Upload, Plus, Trash2 } from "lucide-react";
 import { buildTranscriptDraft } from "@/lib/draft-builder";
 import { api } from "@/lib/api";
+import ChatgptExchange from "@/components/chatgpt-exchange";
 const sections = [
+  "Prepare with ChatGPT",
   "Overview",
   "Video & transcript",
   "Learning objectives",
@@ -34,7 +36,7 @@ export default function LessonEditor({
   onClose: () => void;
 }) {
   const [draft, setDraft] = useState<Lesson>(initial),
-    [section, setSection] = useState(sections[0]),
+    [section, setSection] = useState("Overview"),
     [status, setStatus] = useState(""),
     [error, setError] = useState(false),
     [preview, setPreview] = useState(false),
@@ -216,11 +218,18 @@ export default function LessonEditor({
         </aside>
         <div className="editor-form">
           <h2>{section}</h2>
+          {section === "Prepare with ChatGPT" && <ChatgptExchange lesson={draft} onApply={setDraft} />}
+
           {section === "Overview" && (
             <>
               <p className="editor-help">
                 Set the lesson details students will see in their folder.
               </p>
+              <button className="secondary" onClick={() => setSection("Prepare with ChatGPT")}>Prepare with ChatGPT</button>
+              <label>
+                Teacher review notes (saved privately with your draft)
+                <textarea rows={5} value={(draft.teacherReviewNotes || []).join("\n")} onChange={e => update({teacherReviewNotes:e.target.value.split("\n")})} />
+              </label>
               <label>
                 Lesson title
                 <input

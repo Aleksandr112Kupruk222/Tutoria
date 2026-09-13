@@ -75,3 +75,13 @@ Rule-based extraction is a starting point, not semantic understanding. It can gr
 ## Verification
 
 Production compilation and TypeScript are checked. Integration tests cover action extraction, correction flags, glossary matches, login/password change, secure cookie attributes, teacher ownership, cross-site write rejection, unpublished content isolation, draft/published separation, stale revision rejection, unconfigured OAuth and logout. Real Google consent/caption retrieval requires the owner's OAuth setup. The new interface has not been browser-interaction tested in this iteration.
+
+## Prepare a lesson with your own ChatGPT
+
+In the teacher editor, open **Prepare with ChatGPT**. Import the video's SRT/VTT first, then download the preparation pack. It contains a reusable prompt, the `tutoria-chatgpt-v1` template and that video's timestamped source captions. Upload it yourself to ChatGPT and request the completed JSON file. Tutoria makes no AI API calls.
+
+Return the file to the same editor panel or paste its JSON. Validation checks required fields, video identity, exact source-caption start times, quiz answer indices and size. Preview the sections and steps, apply to the editor, save as a draft and review before publishing. Import keeps the selected lesson ID, folder, video, original transcript and resources. Section titles become prefixes on student step titles. Teacher notes persist in draft JSON and are omitted from published JSON.
+
+Optional concepts, troubleshooting, activities, quiz and teacher notes can be empty arrays. Templates and instructions are generated together in `lib/chatgpt-exchange.ts`; change the format version if introducing an incompatible exchange shape. The existing full-lesson backup importer remains separate.
+
+Checks: `node tests/chatgpt-exchange.mjs` and `node tests/integration.mjs` (after building the Worker).

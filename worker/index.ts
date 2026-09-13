@@ -381,7 +381,7 @@ export async function handleApi(request: Request, env: Env): Promise<Response> {
           : [
               data.folderId,
               serialized,
-              data.action === "publish" ? serialized : null,
+              data.action === "publish" ? JSON.stringify({ ...lesson, teacherReviewNotes: undefined }) : null,
               new Date().toISOString(),
               id,
               user.id,

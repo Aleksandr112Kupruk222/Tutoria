@@ -135,7 +135,7 @@ try {
   assert.equal(badFolder.status, 404);
   const own = cat.lessons[0];
   const payload = {
-    lesson: own.lesson,
+    lesson: {...own.lesson, teacherReviewNotes: ["Teacher-only check"]},
     folderId: own.folderId,
     revision: own.revision,
     action: "publish",
@@ -175,6 +175,9 @@ try {
       .status,
     409,
   );
+  assert.equal((await (await request("/api/lesson?id=" + own.id)).json()).lesson.teacherReviewNotes, undefined);
+  assert.equal((await (await request("/api/catalog")).json()).lessons[0].lesson.teacherReviewNotes, undefined);
+  assert.deepEqual((await (await request("/api/teacher/catalog", undefined, ac)).json()).lessons[0].lesson.teacherReviewNotes, ["Teacher-only check"]);
   const draft = {
     ...payload,
     revision: 2,

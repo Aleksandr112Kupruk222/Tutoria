@@ -15,6 +15,7 @@ const makeLessonSchema = (text: z.ZodString, minimum: number) =>
       durationMinutes: z.number().int().positive(),
       tags: z.array(text).min(minimum),
       sample: z.boolean(),
+      teacherReviewNotes: z.array(z.string().max(20000)).max(100).optional(),
       media: z
         .array(
           z.object({

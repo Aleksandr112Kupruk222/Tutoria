@@ -2273,3 +2273,10 @@ footer,
   }
 }
 .form-actions{flex-wrap:wrap}
+.exchange-stage { border: 1px solid #dfd9e9; border-left: 4px solid #49dce7; border-radius: 10px; padding: 22px; margin: 22px 0; }
+.exchange-stage h3 { margin: 0 0 14px; }
+.exchange-stage p { line-height: 1.65; }
+.exchange-stage details { border-bottom: 1px solid #dfd9e9; padding: 14px 0; }
+.exchange-stage summary { cursor: pointer; font-weight: 600; }
+.exchange-step { padding: 14px 0; }
+.chatgpt-exchange textarea { max-width: 100%; font-family: monospace; }
