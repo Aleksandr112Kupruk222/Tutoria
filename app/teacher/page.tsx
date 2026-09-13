@@ -1,872 +1,550 @@
 "use client";
-import { useEffect, useState } from "react";
-import { Shell, LessonView } from "@/components/tutoria";
+import { useState, useEffect } from "react";
+import Link from "next/link";
+import { Shell } from "@/components/tutoria";
+import LessonEditor from "@/components/lesson-editor";
 import {
-  Lesson,
-  sampleLesson,
-  lessonSchema,
-  parseTranscript,
-  youtubeId,
-} from "@/lib/lessons";
-import { Download, Eye, Save, Upload, Plus, Trash2 } from "lucide-react";
-const key = "tutoria.teacher-draft.v1";
-const sections = [
-  "Overview",
-  "Video & transcript",
-  "Learning objectives",
-  "Steps & chapters",
-  "Key concepts",
-  "Troubleshooting",
-  "Extension activities",
-  "Knowledge check",
-  "Resources",
-  "Structured JSON",
-];
+  api,
+  type Catalog,
+  type Entry,
+  type Folder,
+  type Session,
+} from "@/lib/api";
+import { youtubeId, parseTranscript, type Lesson } from "@/lib/lessons";
+import {buildTranscriptDraft} from "@/lib/draft-builder";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Plus,
+  FolderOpen,
+  Video,
+  ArrowRight,
+  ExternalLink,
+  Settings2,
+  CheckCircle2,
+} from "lucide-react";
 export default function Teacher() {
-  const [draft, setDraft] = useState<Lesson>(sampleLesson),
-    [section, setSection] = useState(sections[0]),
-    [status, setStatus] = useState(""),
-    [error, setError] = useState(false),
-    [preview, setPreview] = useState(false),
-    [raw, setRaw] = useState(""),
-    [json, setJson] = useState(""),
-    [url, setUrl] = useState(
-      `https://www.youtube.com/watch?v=${sampleLesson.media[0].videoId}`,
-    ),
-    [loaded, setLoaded] = useState(false);
-  const notify = (s: string, e = false) => {
-    setStatus(s);
-    setError(e);
+  const [session, setSession] = useState<Session | null>(null),
+    [catalog, setCatalog] = useState<Catalog>({ folders: [], lessons: [] }),
+    [loading, setLoading] = useState(true),
+    [error, setError] = useState(""),
+    [notice, setNotice] = useState(""),
+    [busy, setBusy] = useState(false),
+    [view, setView] = useState<"list" | "folder" | "video">("list"),
+    [folderId, setFolderId] = useState(""),
+    [folderEdit, setFolderEdit] = useState<Folder | null>(null),
+    [name, setName] = useState(""),
+    [description, setDescription] = useState(""),
+    [color, setColor] = useState<Folder["color"]>("cyan"),
+    [title, setTitle] = useState(""),
+    [url, setUrl] = useState(""),
+    [targetFolder, setTargetFolder] = useState(""),
+    [editing, setEditing] = useState<Entry | null>(null),
+    [password, setPassword] = useState(""), [transcriptText,setTranscriptText]=useState("");
+  const refresh = async () => {
+    const s = await api<Session>("/api/teacher/session");
+    setSession(s);
+    if (!s.user.mustChange) {
+      const c = await api<Catalog>("/api/teacher/catalog");
+      setCatalog(c);
+      setTargetFolder((v) => v || c.folders[0]?.id || "");
+    }
   };
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem(key);
-      if (saved) {
-        const d = lessonSchema.parse(JSON.parse(saved));
-        setDraft(d);
-        setUrl(`https://www.youtube.com/watch?v=${d.media[0].videoId}`);
-      }
-    } catch {
-      notify(
-        "The saved draft could not be read. Your sample lesson is available; import a backup to recover your draft.",
-        true,
-      );
-    }
-    setLoaded(true);
+    refresh()
+      .catch((e) => {
+        if (e.status === 401) window.location.replace("/teacher/login/");
+        else setError(e.message);
+      })
+      .finally(() => setLoading(false));
   }, []);
-  const update = (patch: Partial<Lesson>) => {
-    setDraft((d) => ({ ...d, ...patch }));
-    setStatus("Unsaved changes — save a local draft or export a backup.");
-    setError(false);
-  };
-  const validate = () => {
-    const r = lessonSchema.safeParse(draft);
-    if (!r.success) {
-      notify(
-        r.error.issues
-          .map((i) => `${i.path.join(".") || "Lesson"}: ${i.message}`)
-          .join(" · "),
-        true,
-      );
-      return false;
-    }
-    return true;
-  };
-  const save = () => {
-    if (!validate()) return;
+  const run = async (fn: () => Promise<void>) => {
+    setBusy(true);
+    setError("");
+    setNotice("");
     try {
-      localStorage.setItem(key, JSON.stringify(draft));
-      notify(
-        "Draft saved in this browser. Export JSON to keep a portable backup.",
-      );
-    } catch {
-      notify(
-        "Browser storage is unavailable or full. Export JSON to save your work.",
-        true,
-      );
-    }
-  };
-  const exportDraft = () => {
-    if (!validate()) return;
-    const u = URL.createObjectURL(
-      new Blob([JSON.stringify(draft, null, 2)], { type: "application/json" }),
-    );
-    const a = document.createElement("a");
-    a.href = u;
-    a.download = `${draft.slug}.json`;
-    a.click();
-    URL.revokeObjectURL(u);
-    notify(
-      "Validated lesson exported. Publishing to students requires adding it to the content collection and rebuilding the site.",
-    );
-  };
-  const importFile = async (file?: File) => {
-    if (!file) return;
-    try {
-      if (file.size > 2_000_000)
-        throw Error("Use a JSON file smaller than 2 MB.");
-      const d = lessonSchema.parse(JSON.parse(await file.text()));
-      setDraft(d);
-      setUrl(`https://www.youtube.com/watch?v=${d.media[0].videoId}`);
-      notify("Lesson imported for review. Save your local draft when ready.");
+      await fn();
     } catch (e) {
-      notify(
-        `Import failed: ${e instanceof Error ? e.message : "Invalid content"}`,
-        true,
-      );
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
     }
   };
-  if (preview)
+  if (loading)
     return (
-      <>
-        <div className="preview-banner">
-          <strong>Local draft preview</strong>
-          <button onClick={() => setPreview(false)}>Return to editor</button>
-        </div>
-        <LessonView lesson={draft} preview />
-      </>
+      <Shell active="teacher">
+        <p role="status">Opening your workspace…</p>
+      </Shell>
     );
+  if (!session)
+    return (
+      <Shell>
+        <div className="empty">
+          <h2>Unable to open the dashboard</h2>
+          <p role="alert">{error}</p>
+          <Link className="primary" href="/teacher/login/">
+            Return to login
+          </Link>
+        </div>
+      </Shell>
+    );
+  if (session.user.mustChange)
+    return (
+      <Shell active="teacher">
+        <form
+          className="password-form editor-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void run(async () => {
+              await api("/api/auth/password", { password });
+              await refresh();
+            });
+          }}
+        >
+          <div className="eyebrow">WELCOME, {session.user.name}</div>
+          <h1>Make this account yours.</h1>
+          <p>
+            Replace the temporary password before adding lessons or connecting
+            your YouTube channel.
+          </p>
+          <label>
+            New password — at least 12 characters
+            <Input
+              type="password"
+              minLength={12}
+              maxLength={200}
+              required
+              autoComplete="new-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          </label>
+          {error && (
+            <p role="alert" className="status error">
+              {error}
+            </p>
+          )}
+          <Button type="submit" className="primary" disabled={busy}>
+            Set password & open dashboard
+          </Button>
+        </form>
+      </Shell>
+    );
+  if (editing)
+    return (
+      <LessonEditor
+        key={editing.id}
+        initial={editing.lesson}
+        onClose={() => {
+          setEditing(null);
+          void refresh();
+        }}
+        onSave={async (lesson: Lesson, action: "save" | "publish") => {
+          const result = await api<{ revision: number }>(
+            `/api/teacher/lesson?id=${editing.id}`,
+            {
+              lesson,
+              folderId: editing.folderId,
+              revision: editing.revision,
+              action,
+            },
+            "PUT",
+          );
+          setEditing({
+            ...editing,
+            lesson,
+            revision: result.revision,
+            published: action === "publish" || editing.published,
+          });
+        }}
+      />
+    );
+  const folders = catalog.folders;
+  const filtered = catalog.lessons.filter(
+    (l) => !folderId || l.folderId === folderId,
+  );
   return (
     <Shell active="teacher">
-      <div className="editor-top">
+      <div className="dashboard-heading">
         <div>
-          <div className="eyebrow">TEACHER STUDIO</div>
-          <h1>Great lessons start here.</h1>
-          <p>Shape the details. Give your students a clearer path.</p>
+          <div className="eyebrow">YOUR TEACHING WORKSPACE</div>
+          <h1>
+            Hello, <span>{session.user.name}.</span>
+          </h1>
+          <p>
+            Give every lesson a home. Turn your tutorials into something
+            students can follow.
+          </p>
         </div>
-        <div className="editor-actions">
-          <button className="secondary" disabled={!loaded} onClick={save}>
-            <Save size={15} /> Save draft
-          </button>
-          <button
-            className="primary"
-            onClick={() => {
-              if (validate()) setPreview(true);
-            }}
-          >
-            <Eye size={15} /> Preview lesson
-          </button>
-        </div>
-      </div>
-      <div className="sample-note">
-        Prototype editor · Drafts stay in this browser and are not published to
-        students. No teacher authentication or AI generation is connected yet.
-      </div>
-      {status && (
-        <div
-          role={error ? "alert" : "status"}
-          className={`status ${error ? "error" : ""}`}
+        <Button
+          className="primary"
+          onClick={() => {
+            setView("video");
+            setTitle("");
+            setUrl("");
+            setError("");
+          }}
         >
-          {status}
+          <Plus size={17} />
+          Add a video
+        </Button>
+      </div>
+      {error && (
+        <div className="status error" role="alert">
+          {error}
         </div>
       )}
-      <div className="editor-layout">
-        <aside className="editor-nav">
-          {sections.map((s) => (
-            <button
-              className={section === s ? "active" : ""}
-              key={s}
-              onClick={() => {
-                if (s === "Structured JSON")
-                  setJson(JSON.stringify(draft, null, 2));
-                setSection(s);
-              }}
-            >
-              {s}
-            </button>
-          ))}
-          <p className="editor-note">
-            1. Import your transcript
-            <br />
-            2. Review and edit the lesson
-            <br />
-            3. Preview the student view
-            <br />
-            4. Export the reviewed content
+      {notice && (
+        <div className="status" role="status">
+          {notice}
+        </div>
+      )}
+      <section className="youtube-panel">
+        <Video size={29} />
+        <div>
+          <h3>
+            {session.youtube.connection
+              ? session.youtube.connection.channel_title
+              : "Connect your YouTube channel"}
+          </h3>
+          <p>
+            {session.youtube.connection
+              ? "Connected to your teacher account. Import captions from videos you can edit."
+              : session.youtube.configured
+                ? "Connect your own channel to import video details and available captions."
+                : "Google OAuth setup is needed for channel connections. Manual transcript import is ready to use."}
           </p>
-        </aside>
-        <div className="editor-form">
-          <h2>{section}</h2>
-          {section === "Overview" && (
-            <>
-              <p className="editor-help">
-                Start from the sample, then replace its content with your own.
-              </p>
-              <label>
-                Lesson title
-                <input
-                  value={draft.title}
-                  onChange={(e) => update({ title: e.target.value })}
-                />
-              </label>
-              <label>
-                Short description
-                <textarea
-                  value={draft.description}
-                  onChange={(e) => update({ description: e.target.value })}
-                />
-              </label>
-              <div className="two-fields">
-                <label>
-                  Lesson ID
-                  <input
-                    value={draft.id}
-                    onChange={(e) => update({ id: e.target.value })}
-                  />
-                </label>
-                <label>
-                  URL slug
-                  <input
-                    value={draft.slug}
-                    onChange={(e) => update({ slug: e.target.value })}
-                  />
-                </label>
-              </div>
-              <label>
-                Module / topic
-                <input
-                  value={draft.module}
-                  onChange={(e) => update({ module: e.target.value })}
-                />
-              </label>
-              <div className="two-fields">
-                <label>
-                  Difficulty
-                  <select
-                    value={draft.difficulty}
-                    onChange={(e) =>
-                      update({
-                        difficulty: e.target.value as Lesson["difficulty"],
-                      })
-                    }
-                  >
-                    {["Beginner", "Intermediate", "Advanced"].map((x) => (
-                      <option key={x}>{x}</option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  Lesson duration (minutes)
-                  <input
-                    type="number"
-                    min="1"
-                    value={draft.durationMinutes}
-                    onChange={(e) =>
-                      update({ durationMinutes: Number(e.target.value) })
-                    }
-                  />
-                </label>
-              </div>
-              <label>
-                Tags (comma separated)
-                <input
-                  value={draft.tags.join(", ")}
-                  onChange={(e) =>
-                    update({
-                      tags: e.target.value.split(",").map((t) => t.trim()),
-                    })
-                  }
-                />
-              </label>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={draft.sample}
-                  onChange={(e) => update({ sample: e.target.checked })}
-                />{" "}
-                Label as illustrative sample content
-              </label>
-              <div className="editor-actions">
-                <button className="secondary" onClick={exportDraft}>
-                  <Download size={15} /> Export lesson JSON
-                </button>
-                <label className="secondary file-label">
-                  <Upload size={15} /> Import lesson JSON
-                  <input
-                    className="file-input"
-                    type="file"
-                    accept=".json,application/json"
-                    onChange={(e) => {
-                      void importFile(e.target.files?.[0]);
-                      e.target.value = "";
-                    }}
-                  />
-                </label>
-              </div>
-            </>
-          )}
-          {section === "Video & transcript" && (
-            <>
-              <p className="editor-help">
-                Paste a YouTube URL, then manually import your own captions.
-                Automatic caption retrieval will require owner-authorised
-                YouTube access.
-              </p>
-              <label>
-                YouTube URL
-                <input value={url} onChange={(e) => setUrl(e.target.value)} />
-              </label>
-              <button
-                className="secondary"
-                onClick={() => {
-                  const id = youtubeId(url);
-                  if (!id) {
-                    notify(
-                      "Enter a valid HTTPS YouTube watch, short, embed or youtu.be URL.",
-                      true,
-                    );
-                    return;
-                  }
-                  update({
-                    media: draft.media.map((m, i) =>
-                      i === 0 ? { ...m, videoId: id } : m,
-                    ),
-                  });
-                  notify(
-                    "Video attached. Import its transcript below; existing lesson text is unchanged.",
-                  );
-                }}
-              >
-                Attach video
-              </button>
-              <label>
-                Video title
-                <input
-                  value={draft.media[0].title}
-                  onChange={(e) =>
-                    update({
-                      media: draft.media.map((m, i) =>
-                        i === 0 ? { ...m, title: e.target.value } : m,
-                      ),
-                    })
-                  }
-                />
-              </label>
-              <label>
-                Paste transcript or captions
-                <textarea
-                  className="long-text"
-                  value={raw}
-                  onChange={(e) => setRaw(e.target.value)}
-                  placeholder={
-                    "00:00 Introduction\n02:00 Define the input actions\n\nPlain text, SRT and WebVTT are supported."
-                  }
-                />
-              </label>
-              <label className="secondary file-label">
-                <Upload size={15} /> Load .txt / .srt / .vtt
-                <input
-                  className="file-input"
-                  type="file"
-                  accept=".txt,.srt,.vtt"
-                  onChange={async (e) => {
-                    const f = e.target.files?.[0];
-                    if (f) {
-                      if (f.size > 2_000_000) {
-                        notify("Use a transcript smaller than 2 MB.", true);
-                        return;
-                      }
-                      setRaw(await f.text());
-                      notify(
-                        "Caption file loaded. Review the text, then import it.",
-                      );
-                    }
-                    e.target.value = "";
-                  }}
-                />
-              </label>
-              <button
-                className="primary"
-                onClick={() => {
-                  try {
-                    const transcript = parseTranscript(raw, draft.media[0].id);
-                    update({ transcript });
-                    notify(
-                      `Imported ${transcript.length} transcript segments. Review timings and manually edit the guide; AI generation is not connected.`,
-                    );
-                  } catch (e) {
-                    notify((e as Error).message, true);
-                  }
-                }}
-              >
-                Import transcript
-              </button>
-              <p className="editor-help">
-                Current transcript: {draft.transcript.length} segments. Plain
-                text is stored at 0:00; add timings in Structured JSON. Import
-                replaces the current draft transcript.
-              </p>
-            </>
-          )}
-          {section === "Learning objectives" && (
+        </div>
+        {session.youtube.connection ? (
+          <Button
+            className="secondary"
+            disabled={busy}
+            onClick={() =>
+              void run(async () => {
+                const r = await api<{ warning?: string }>(
+                  "/api/youtube/disconnect",
+                  {},
+                );
+                await refresh();
+                setNotice(
+                  r.warning || "YouTube disconnected from your account.",
+                );
+              })
+            }
+          >
+            Disconnect
+          </Button>
+        ) : (
+          <Button
+            className="secondary"
+            disabled={busy || !session.youtube.configured}
+            onClick={() =>
+              void run(async () => {
+                const r = await api<{ url: string }>("/api/youtube/start", {});
+                window.location.assign(r.url);
+              })
+            }
+          >
+            Connect YouTube <ExternalLink size={15} />
+          </Button>
+        )}
+      </section>
+      {view === "folder" && (
+        <form
+          className="dashboard-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void run(async () => {
+              await api(
+                folderEdit
+                  ? `/api/teacher/folder?id=${folderEdit.id}`
+                  : "/api/teacher/folders",
+                { name, description, color },
+                folderEdit ? "PUT" : "POST",
+              );
+              await refresh();
+              setView("list");
+              setNotice(folderEdit ? "Folder updated." : "Folder created.");
+            });
+          }}
+        >
+          <h2>{folderEdit ? "Edit folder" : "Create a lesson folder"}</h2>
+          <div className="two-fields">
             <label>
-              One learning objective per line
-              <textarea
-                className="long-text"
-                value={draft.objectives.join("\n")}
-                onChange={(e) =>
-                  update({ objectives: e.target.value.split("\n") })
-                }
+              Folder name
+              <Input
+                required
+                maxLength={80}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g. Unreal Engine"
               />
             </label>
-          )}
-          {section === "Steps & chapters" && (
-            <>
-              {draft.steps.map((s, i) => (
-                <div className="entry" key={s.id}>
-                  <h3>Step {i + 1}</h3>
-                  <label>
-                    Title
-                    <input
-                      value={s.title}
-                      onChange={(e) =>
-                        update({
-                          steps: draft.steps.map((x, j) =>
-                            j === i ? { ...x, title: e.target.value } : x,
-                          ),
-                        })
-                      }
-                    />
-                  </label>
-                  <div className="two-fields">
-                    <label>
-                      Start time (seconds)
-                      <input
-                        type="number"
-                        min="0"
-                        value={s.seconds}
-                        onChange={(e) =>
-                          update({
-                            steps: draft.steps.map((x, j) =>
-                              j === i
-                                ? { ...x, seconds: Number(e.target.value) }
-                                : x,
-                            ),
-                          })
-                        }
-                      />
-                    </label>
-                    <label>
-                      Video
-                      <select
-                        value={s.mediaId}
-                        onChange={(e) =>
-                          update({
-                            steps: draft.steps.map((x, j) =>
-                              j === i ? { ...x, mediaId: e.target.value } : x,
-                            ),
-                          })
-                        }
-                      >
-                        {draft.media.map((m) => (
-                          <option value={m.id} key={m.id}>
-                            {m.title}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  </div>
-                  <label>
-                    Written instructions
-                    <textarea
-                      value={s.body}
-                      onChange={(e) =>
-                        update({
-                          steps: draft.steps.map((x, j) =>
-                            j === i ? { ...x, body: e.target.value } : x,
-                          ),
-                        })
-                      }
-                    />
-                  </label>
-                  <label>
-                    Code (optional)
-                    <textarea
-                      value={s.code || ""}
-                      onChange={(e) =>
-                        update({
-                          steps: draft.steps.map((x, j) =>
-                            j === i ? { ...x, code: e.target.value } : x,
-                          ),
-                        })
-                      }
-                    />
-                  </label>
-                  <label>
-                    Checkpoint
-                    <input
-                      value={s.check}
-                      onChange={(e) =>
-                        update({
-                          steps: draft.steps.map((x, j) =>
-                            j === i ? { ...x, check: e.target.value } : x,
-                          ),
-                        })
-                      }
-                    />
-                  </label>
-                  <button
-                    className="danger"
-                    disabled={draft.steps.length === 1}
-                    onClick={() =>
-                      update({ steps: draft.steps.filter((_, j) => j !== i) })
-                    }
-                  >
-                    <Trash2 size={14} /> Remove step
-                  </button>
-                </div>
-              ))}
-              <button
-                className="secondary"
-                onClick={() =>
-                  update({
-                    steps: [
-                      ...draft.steps,
-                      {
-                        id: crypto.randomUUID(),
-                        title: "New step",
-                        mediaId: draft.media[0].id,
-                        seconds: 0,
-                        body: "Write your instructions here.",
-                        check: "Describe a successful result.",
-                      },
-                    ],
-                  })
-                }
+            <label>
+              Colour
+              <select
+                value={color}
+                onChange={(e) => setColor(e.target.value as Folder["color"])}
               >
-                <Plus size={15} /> Add step
-              </button>
-            </>
-          )}
-          {section === "Key concepts" && (
-            <>
-              {draft.concepts.map((c, i) => (
-                <div className="entry" key={i}>
-                  <label>
-                    Term
-                    <input
-                      value={c.term}
-                      onChange={(e) =>
-                        update({
-                          concepts: draft.concepts.map((x, j) =>
-                            j === i ? { ...x, term: e.target.value } : x,
-                          ),
-                        })
-                      }
-                    />
-                  </label>
-                  <label>
-                    Definition
-                    <textarea
-                      value={c.definition}
-                      onChange={(e) =>
-                        update({
-                          concepts: draft.concepts.map((x, j) =>
-                            j === i ? { ...x, definition: e.target.value } : x,
-                          ),
-                        })
-                      }
-                    />
-                  </label>
-                </div>
-              ))}
-              <button
-                className="secondary"
-                onClick={() =>
-                  update({
-                    concepts: [
-                      ...draft.concepts,
-                      {
-                        term: "New concept",
-                        definition: "Explain this concept.",
-                      },
-                    ],
-                  })
-                }
-              >
-                Add concept
-              </button>
-            </>
-          )}
-          {section === "Troubleshooting" && (
-            <>
-              {draft.troubleshooting.map((t, i) => (
-                <div className="entry" key={i}>
-                  <label>
-                    Problem
-                    <input
-                      value={t.problem}
-                      onChange={(e) =>
-                        update({
-                          troubleshooting: draft.troubleshooting.map((x, j) =>
-                            j === i ? { ...x, problem: e.target.value } : x,
-                          ),
-                        })
-                      }
-                    />
-                  </label>
-                  <label>
-                    Solution
-                    <textarea
-                      value={t.solution}
-                      onChange={(e) =>
-                        update({
-                          troubleshooting: draft.troubleshooting.map((x, j) =>
-                            j === i ? { ...x, solution: e.target.value } : x,
-                          ),
-                        })
-                      }
-                    />
-                  </label>
-                </div>
-              ))}
-              <button
-                className="secondary"
-                onClick={() =>
-                  update({
-                    troubleshooting: [
-                      ...draft.troubleshooting,
-                      { problem: "New problem", solution: "Describe the fix." },
-                    ],
-                  })
-                }
-              >
-                Add troubleshooting advice
-              </button>
-            </>
-          )}
-          {section === "Extension activities" &&
-            draft.extensions.map((x, i) => (
-              <div className="entry" key={x.level}>
-                <h3>{x.level}</h3>
-                <label>
-                  Activity title
-                  <input
-                    value={x.title}
-                    onChange={(e) =>
-                      update({
-                        extensions: draft.extensions.map((v, j) =>
-                          j === i ? { ...v, title: e.target.value } : v,
-                        ),
-                      })
-                    }
-                  />
-                </label>
-                <label>
-                  Instructions
-                  <textarea
-                    value={x.body}
-                    onChange={(e) =>
-                      update({
-                        extensions: draft.extensions.map((v, j) =>
-                          j === i ? { ...v, body: e.target.value } : v,
-                        ),
-                      })
-                    }
-                  />
-                </label>
-              </div>
-            ))}
-          {section === "Knowledge check" && (
-            <>
-              {draft.quiz.map((q, i) => (
-                <div className="entry" key={q.id}>
-                  <label>
-                    Question {i + 1}
-                    <input
-                      value={q.question}
-                      onChange={(e) =>
-                        update({
-                          quiz: draft.quiz.map((v, j) =>
-                            j === i ? { ...v, question: e.target.value } : v,
-                          ),
-                        })
-                      }
-                    />
-                  </label>
-                  {q.options.map((o, k) => (
-                    <label key={k}>
-                      Option {k + 1}
-                      <input
-                        value={o}
-                        onChange={(e) =>
-                          update({
-                            quiz: draft.quiz.map((v, j) =>
-                              j === i
-                                ? {
-                                    ...v,
-                                    options: v.options.map((a, b) =>
-                                      b === k ? e.target.value : a,
-                                    ),
-                                  }
-                                : v,
-                            ),
-                          })
-                        }
-                      />
-                    </label>
-                  ))}
-                  <label>
-                    Correct answer
-                    <select
-                      value={q.answer}
-                      onChange={(e) =>
-                        update({
-                          quiz: draft.quiz.map((v, j) =>
-                            j === i
-                              ? { ...v, answer: Number(e.target.value) }
-                              : v,
-                          ),
-                        })
-                      }
-                    >
-                      {q.options.map((o, k) => (
-                        <option key={k} value={k}>
-                          Option {k + 1}: {o}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label>
-                    Explanation
-                    <textarea
-                      value={q.explanation}
-                      onChange={(e) =>
-                        update({
-                          quiz: draft.quiz.map((v, j) =>
-                            j === i ? { ...v, explanation: e.target.value } : v,
-                          ),
-                        })
-                      }
-                    />
-                  </label>
-                </div>
-              ))}
-              <button
-                className="secondary"
-                onClick={() =>
-                  update({
-                    quiz: [
-                      ...draft.quiz,
-                      {
-                        id: crypto.randomUUID(),
-                        question: "New question",
-                        options: ["First option", "Second option"],
-                        answer: 0,
-                        explanation: "Explain the correct answer.",
-                      },
-                    ],
-                  })
-                }
-              >
-                Add question
-              </button>
-            </>
-          )}
-          {section === "Resources" && (
-            <>
-              {draft.resources.map((r, i) => (
-                <div className="entry" key={i}>
-                  <label>
-                    Resource title
-                    <input
-                      value={r.title}
-                      onChange={(e) =>
-                        update({
-                          resources: draft.resources.map((v, j) =>
-                            j === i ? { ...v, title: e.target.value } : v,
-                          ),
-                        })
-                      }
-                    />
-                  </label>
-                  <label>
-                    HTTPS URL
-                    <input
-                      value={r.url}
-                      onChange={(e) =>
-                        update({
-                          resources: draft.resources.map((v, j) =>
-                            j === i ? { ...v, url: e.target.value } : v,
-                          ),
-                        })
-                      }
-                    />
-                  </label>
-                  <label>
-                    Description
-                    <input
-                      value={r.description}
-                      onChange={(e) =>
-                        update({
-                          resources: draft.resources.map((v, j) =>
-                            j === i ? { ...v, description: e.target.value } : v,
-                          ),
-                        })
-                      }
-                    />
-                  </label>
-                </div>
-              ))}
-              <button
-                className="secondary"
-                onClick={() =>
-                  update({
-                    resources: [
-                      ...draft.resources,
-                      {
-                        title: "New resource",
-                        url: "https://docs.godotengine.org",
-                        description: "Describe this resource.",
-                      },
-                    ],
-                  })
-                }
-              >
-                Add resource
-              </button>
-            </>
-          )}
-          {section === "Structured JSON" && (
-            <>
-              <p className="editor-help">
-                Edit the full data structure, including media, transcript
-                timings and array entries. Changes are applied only after schema
-                validation.
-              </p>
-              <textarea
-                aria-label="Lesson JSON"
-                className="long-text"
-                spellCheck={false}
-                value={json}
-                onChange={(e) => setJson(e.target.value)}
+                <option value="cyan">Cyan</option>
+                <option value="magenta">Magenta</option>
+                <option value="green">Green</option>
+              </select>
+            </label>
+          </div>
+          <label>
+            Short description
+            <Textarea
+              maxLength={350}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+            />
+          </label>
+          <div className="form-actions">
+            <Button className="primary" disabled={busy} type="submit">
+              Save folder
+            </Button>
+            <Button
+              className="secondary"
+              type="button"
+              onClick={() => setView("list")}
+            >
+              Cancel
+            </Button>
+          </div>
+        </form>
+      )}
+      {view === "video" && (
+        <form
+          className="dashboard-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void run(async () => {
+              const videoId = youtubeId(url);
+              if (!videoId) throw Error("Paste a valid HTTPS YouTube link.");
+              let imported:{title:string;description:string;transcript:Lesson['transcript'];warning:string|null}|null=null;
+              if(session.youtube.connection&&!transcriptText.trim()) imported=await api('/api/youtube/import',{videoId});
+              const lessonTitle=title.trim()||imported?.title;
+              if(!lessonTitle)throw Error('Enter a lesson title when importing manually.');
+              const r = await api<{entry:Entry}>('/api/teacher/lessons',{title:lessonTitle,videoId,folderId:targetFolder});
+              let entry=r.entry;
+              const transcript=transcriptText.trim()?parseTranscript(transcriptText,'screen'):imported?.transcript||[];
+              if(transcript.length){const generated=buildTranscriptDraft({...entry.lesson,transcript},imported?.description||'');
+                try{const saved=await api<{revision:number}>(`/api/teacher/lesson?id=${entry.id}`,{lesson:generated.lesson,folderId:entry.folderId,revision:entry.revision,action:'save'},'PUT');entry={...entry,lesson:generated.lesson,revision:saved.revision};}catch{entry={...entry,lesson:generated.lesson};}
+              }
+              setEditing(entry);
+              setView("list");
+            });
+          }}
+        >
+          <div className="eyebrow">START A NEW LESSON</div>
+          <h2>Add your video</h2>
+          <p>
+            Paste your video link. Connected captions or a pasted transcript become an editable draft using rules, with no AI calls.
+          </p>
+          <label>
+            YouTube URL
+            <Input
+              required
+              type="url"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              placeholder="https://www.youtube.com/watch?v=…"
+            />
+          </label>
+          <div className="two-fields">
+            <label>
+              Lesson title (optional with a connected channel)
+              <Input
+                required={!session.youtube.connection}
+                maxLength={160}
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
               />
-              <button
-                className="primary"
-                onClick={() => {
-                  try {
-                    const d = lessonSchema.parse(JSON.parse(json));
-                    setDraft(d);
-                    setUrl(
-                      `https://www.youtube.com/watch?v=${d.media[0].videoId}`,
+            </label>
+            <label>
+              Lesson folder
+              <select
+                required
+                value={targetFolder}
+                onChange={(e) => setTargetFolder(e.target.value)}
+              >
+                <option value="" disabled>
+                  Choose a folder
+                </option>
+                {folders.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <label>Transcript (optional fallback)<Textarea value={transcriptText} onChange={e=>setTranscriptText(e.target.value)} placeholder="Paste timed captions here if your channel is not connected."/></label>
+          <div className="form-actions">
+            <Button className="primary" type="submit" disabled={busy}>
+              {busy?'Building draft…':'Create draft'} <ArrowRight size={17} />
+            </Button>
+            <Button
+              className="secondary"
+              type="button"
+              onClick={() => setView("list")}
+            >
+              Cancel
+            </Button>
+          </div>
+        </form>
+      )}
+      <div className="library-heading">
+        <h2>Your lesson folders</h2>
+        <Button
+          className="secondary"
+          onClick={() => {
+            setFolderEdit(null);
+            setName("");
+            setDescription("");
+            setColor("cyan");
+            setView("folder");
+            setError("");
+          }}
+        >
+          <Plus size={16} />
+          New folder
+        </Button>
+      </div>
+      <div className="folder-grid">
+        {folders.map((f) => (
+          <div
+            key={f.id}
+            className={`folder-card tone-${f.color} ${folderId === f.id ? "chosen" : ""}`}
+          >
+            <button
+              className="folder-main"
+              onClick={() => setFolderId(folderId === f.id ? "" : f.id)}
+              aria-pressed={folderId === f.id}
+            >
+              <FolderOpen size={25} />
+              <h3>{f.name}</h3>
+              <p>{f.description}</p>
+              <span className="folder-bottom">
+                {catalog.lessons.filter((l) => l.folderId === f.id).length}{" "}
+                lessons <ArrowRight size={16} />
+              </span>
+            </button>
+            <button
+              className="folder-edit"
+              aria-label={`Edit ${f.name}`}
+              onClick={() => {
+                setFolderEdit(f);
+                setName(f.name);
+                setDescription(f.description);
+                setColor(f.color);
+                setView("folder");
+              }}
+            >
+              <Settings2 size={16} />
+            </button>
+          </div>
+        ))}
+      </div>
+      <div className="library-heading">
+        <h2>
+          {folderId
+            ? folders.find((f) => f.id === folderId)?.name
+            : "All your lessons"}
+        </h2>
+        {folderId && (
+          <button className="secondary" onClick={() => setFolderId("")}>
+            Show all
+          </button>
+        )}
+      </div>
+      <div className="lesson-table">
+        {filtered.map((e) => (
+          <div className="lesson-row" key={e.id}>
+            <img
+              src={`https://i.ytimg.com/vi/${e.lesson.media[0].videoId}/default.jpg`}
+              alt=""
+            />
+            <div className="lesson-row-title">
+              <h3>{e.lesson.title}</h3>
+              <span className={`badge ${e.published ? "" : "draft-badge"}`}>
+                {e.published ? "Published" : "Draft"}
+              </span>
+            </div>
+            <label className="assign-folder">
+              <span>Folder</span>
+              <select
+                aria-label={`Folder for ${e.lesson.title}`}
+                disabled={busy}
+                value={e.folderId}
+                onChange={(event) => {
+                  const id = event.target.value;
+                  void run(async () => {
+                    await api(
+                      `/api/teacher/lesson?id=${e.id}`,
+                      {
+                        lesson: e.lesson,
+                        folderId: id,
+                        revision: e.revision,
+                        action: "save",
+                      },
+                      "PUT",
                     );
-                    notify(
-                      "JSON validated and applied. Save the draft to retain these changes.",
-                    );
-                  } catch (e) {
-                    notify(
-                      `JSON was not applied: ${(e as Error).message}`,
-                      true,
-                    );
-                  }
+                    await refresh();
+                    setNotice("Lesson moved to its new folder.");
+                  });
                 }}
               >
-                Validate & apply JSON
-              </button>
-            </>
-          )}
-        </div>
+                {folders.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="row-actions">
+              <Button className="secondary" onClick={() => setEditing(e)}>
+                Edit content
+              </Button>
+              {e.published && (
+                <button
+                  className="text-button"
+                  disabled={busy}
+                  onClick={() =>
+                    void run(async () => {
+                      await api(
+                        `/api/teacher/lesson?id=${e.id}`,
+                        {
+                          lesson: e.lesson,
+                          folderId: e.folderId,
+                          revision: e.revision,
+                          action: "unpublish",
+                        },
+                        "PUT",
+                      );
+                      await refresh();
+                      setNotice(
+                        "Lesson returned to draft. It is no longer visible to students.",
+                      );
+                    })
+                  }
+                >
+                  Unpublish
+                </button>
+              )}
+            </div>
+          </div>
+        ))}
       </div>
+      {!filtered.length && (
+        <div className="empty">
+          <Video size={28} />
+          <h3>No lessons here yet</h3>
+          <p>Add a video to start your first draft.</p>
+        </div>
+      )}
     </Shell>
   );
 }
