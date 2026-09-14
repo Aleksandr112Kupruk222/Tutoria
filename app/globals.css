@@ -2331,3 +2331,157 @@ footer,
 .student-lesson-row .card-content h3 { margin-top: 10px; }
 .student-lesson-row .card-content p { margin-bottom: 10px; }
 .student-lesson-row .card-content { padding-top: 16px; padding-bottom: 16px; }
+
+/* User-selectable colour theme. */
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 38px;
+  padding: 8px 11px;
+  border: 1px solid #e0dae8;
+  border-radius: 7px;
+  color: #51475d;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.theme-toggle:hover {
+  background: #f4f1f7;
+  border-color: #bfb4ca;
+  color: #171020;
+}
+
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --paper: #0f0b17;
+  --ink: #f5f1fa;
+  --muted: #b5acbf;
+  --line: #372e43;
+  --background: #0f0b17;
+  --foreground: #f5f1fa;
+  --secondary: #21192c;
+  --secondary-foreground: #f5f1fa;
+  --input: #483b56;
+  --muted-foreground: #b5acbf;
+}
+html[data-theme="dark"] body {
+  background: #0f0b17;
+  color: #f5f1fa;
+}
+html[data-theme="dark"] .course-nav .brand,
+html[data-theme="dark"] .course-shell .lesson-heading h1 {
+  color: #f8f4fc;
+}
+html[data-theme="dark"] .course-area,
+html[data-theme="dark"] .course-shell footer,
+html[data-theme="dark"] .folder-card p,
+html[data-theme="dark"] .login-form > p,
+html[data-theme="dark"] .dashboard-heading p,
+html[data-theme="dark"] .youtube-panel p,
+html[data-theme="dark"] .dashboard-form p,
+html[data-theme="dark"] .course-shell .editor-note,
+html[data-theme="dark"] .course-shell .chapter-number,
+html[data-theme="dark"] .course-shell .chapter time,
+html[data-theme="dark"] .course-shell .objectives p,
+html[data-theme="dark"] .course-shell .objectives p svg,
+html[data-theme="dark"] .start-panel p,
+html[data-theme="dark"] .next-card p {
+  color: #b9afc5;
+}
+html[data-theme="dark"] .theme-toggle,
+html[data-theme="dark"] .teacher-login {
+  border-color: #493b57;
+  color: #e9e0f2;
+}
+html[data-theme="dark"] .theme-toggle:hover,
+html[data-theme="dark"] .teacher-login:hover {
+  background: #251b31;
+  border-color: #6c577e;
+  color: #ffffff;
+}
+html[data-theme="dark"] :is(
+  .folder-card,
+  .start-panel,
+  .login-form,
+  .dashboard-form,
+  .youtube-panel,
+  .lesson-table,
+  .lesson-row,
+  .student-lesson-row,
+  .exchange-stage,
+  .next-card,
+  .sample-note
+) {
+  background: #191322;
+  border-color: #3b3048;
+}
+html[data-theme="dark"] .folder-card.chosen {
+  background: #21172c;
+}
+html[data-theme="dark"] :is(input, textarea, select),
+html[data-theme="dark"] .course-shell :is(.editor-form input, .editor-form textarea) {
+  background: #16101f;
+  border-color: #493c57;
+  color: #f7f2fb;
+}
+html[data-theme="dark"] :is(input, textarea)::placeholder {
+  color: #93879f;
+}
+html[data-theme="dark"] .course-shell .sample-note {
+  color: #c8becf;
+}
+html[data-theme="dark"] .course-shell .next-card h3,
+html[data-theme="dark"] .course-shell .next-card a,
+html[data-theme="dark"] .login-form label,
+html[data-theme="dark"] .dashboard-form label,
+html[data-theme="dark"] .password-form label {
+  color: #f2ebf7;
+}
+html[data-theme="dark"] .course-shell .badge,
+html[data-theme="dark"] .course-shell .status {
+  background: #123b2b;
+  color: #69efac;
+}
+html[data-theme="dark"] .course-shell .count,
+html[data-theme="dark"] .draft-badge {
+  background: #3a1b40 !important;
+  color: #f09bed !important;
+}
+html[data-theme="dark"] .course-shell .timestamp,
+html[data-theme="dark"] .course-shell .chapter.selected {
+  background: #12363d;
+  color: #6ae8f0;
+}
+html[data-theme="dark"] .course-shell .checkpoint,
+html[data-theme="dark"] .course-shell .quiz-question .correct {
+  background: #123425;
+  border-color: #277950;
+  color: #77e6a8;
+}
+html[data-theme="dark"] .course-shell .checkpoint :is(h3, p),
+html[data-theme="dark"] .course-shell .feedback {
+  color: #80e8ad;
+}
+html[data-theme="dark"] .course-shell .status.error {
+  background: #421f25;
+  color: #ffaaa1;
+}
+html[data-theme="dark"] .draggable-lesson.drop-target {
+  background: #17363b;
+}
+
+@media (max-width: 650px) {
+  .theme-toggle {
+    padding: 8px;
+  }
+  .theme-toggle-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+}

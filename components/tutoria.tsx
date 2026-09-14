@@ -31,6 +31,8 @@ import {
   Menu,
   X,
   ExternalLink,
+  Moon,
+  Sun,
 } from "lucide-react";
 
 import { lessons, Lesson, stamp } from "@/lib/lessons";
@@ -47,6 +49,21 @@ export function Shell({
   active?: string;
 }) {
   const teacher = active === "teacher";
+  const [theme, setTheme] = useState<"light" | "dark">("light");
+
+  useEffect(() => {
+    const syncTheme = window.setTimeout(() => {
+      setTheme(document.documentElement.dataset.theme === "dark" ? "dark" : "light");
+    }, 0);
+    return () => window.clearTimeout(syncTheme);
+  }, []);
+
+  const toggleTheme = () => {
+    const nextTheme = theme === "dark" ? "light" : "dark";
+    document.documentElement.dataset.theme = nextTheme;
+    localStorage.setItem("tutoria-theme", nextTheme);
+    setTheme(nextTheme);
+  };
 
   return (
     <div className={`app-shell course-shell ${teacher ? "teacher-shell" : ""}`}>
@@ -65,6 +82,18 @@ export function Shell({
           {teacher ? "TEACHER WORKSPACE" : "DIGITAL TECHNOLOGIES HUB"}
         </span>
         <nav>
+          <button
+            className="theme-toggle"
+            type="button"
+            onClick={toggleTheme}
+            aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
+            title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
+          >
+            {theme === "dark" ? <Sun size={17} /> : <Moon size={17} />}
+            <span className="theme-toggle-label">
+              {theme === "dark" ? "Light mode" : "Dark mode"}
+            </span>
+          </button>
           {teacher ? (
             <>
               <Link href="/">
