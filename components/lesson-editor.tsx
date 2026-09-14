@@ -57,6 +57,12 @@ export default function LessonEditor({
     setHasStagedImport(false);
     return true;
   };
+  const continueEditingImportedLesson = (imported: Lesson) => {
+    setDraft(imported);
+    setHasStagedImport(false);
+    setSection("Overview");
+    notify("Edited import applied to this draft. Continue editing, then save the draft when ready.");
+  };
   useEffect(() => {
     setLoaded(true);
   }, []);
@@ -226,7 +232,7 @@ export default function LessonEditor({
         </aside>
         <div className="editor-form">
           <h2>{section}</h2>
-          {section === "Prepare with AI" && <ChatgptExchange lesson={draft} onApply={setDraft} onStagedChange={setHasStagedImport} />}
+          {section === "Prepare with AI" && <ChatgptExchange lesson={draft} onApply={setDraft} onApplyAndEdit={continueEditingImportedLesson} onStagedChange={setHasStagedImport} />}
 
           {section === "Overview" && (
             <>

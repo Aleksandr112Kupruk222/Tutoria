@@ -21,7 +21,7 @@ function firstTimestamp(value: string) {
   return match[3] ? Number(match[1]) * 3600 + Number(match[2]) * 60 + Number(match[3]) : Number(match[1]) * 60 + Number(match[2]);
 }
 
-export default function ChatgptExchange({ lesson, onApply, onStagedChange }: { lesson: Lesson; onApply: (lesson: Lesson) => void; onStagedChange: (staged: boolean) => void }) {
+export default function ChatgptExchange({ lesson, onApply, onApplyAndEdit, onStagedChange }: { lesson: Lesson; onApply: (lesson: Lesson) => void; onApplyAndEdit: (lesson: Lesson) => void; onStagedChange: (staged: boolean) => void }) {
   const [captions, setCaptions] = useState("");
   const [raw, setRaw] = useState("");
   const [candidate, setCandidate] = useState<ChatgptLesson | null>(null);
@@ -110,8 +110,8 @@ export default function ChatgptExchange({ lesson, onApply, onStagedChange }: { l
         {candidate.teacherReviewNotes.map((note, index) => { const seconds = firstTimestamp(note); const resolved = noteResolved(note); return <article className={`teacher-check ${resolved ? "resolved" : ""}`} key={index}><label>Check {index + 1}<textarea rows={3} value={noteText(note)} onChange={event => edit(next => { next.teacherReviewNotes[index] = `${resolved ? "[Resolved] " : ""}${event.target.value}`; })} /></label><div className="teacher-check-actions"><label className="resolved-toggle"><input type="checkbox" checked={resolved} onChange={event => edit(next => { next.teacherReviewNotes[index] = `${event.target.checked ? "[Resolved] " : ""}${noteText(next.teacherReviewNotes[index])}`; })} />Reviewed / Resolved</label>{seconds !== null && <><button className="secondary compact" type="button" onClick={() => jumpToVideo(seconds)}><Play size={13} />Watch {stamp(seconds)}</button><button className="secondary compact" type="button" onClick={() => findNearestStep(seconds)}><LocateFixed size={13} />Find nearest step</button></>}</div></article>; })}
         {!candidate.teacherReviewNotes.length && <p className="editor-help">The package contains no teacher checks.</p>}
       </div>
-      <p className="review-apply-note">Applying replaces the lesson overview, objectives, steps, concepts, troubleshooting, activities, quiz and teacher notes with this edited staged copy. Your video, source transcript, folder and resources stay attached. Nothing is published automatically.</p>
-      <div className="editor-actions"><button className="primary" onClick={() => run(() => { const checked = parseChatgptLesson(JSON.stringify(candidate), lesson); const editedLesson = applyChatgptLesson(checked, lesson); onApply(editedLesson); setCandidate(null); setRaw(""); setStagedDirty(false); setShowReviewVideo(false); setNotice("Edited import applied to the editor draft. Review the lesson, then Save draft or Preview lesson."); })}>Validate &amp; apply edited lesson</button><button className="secondary" onClick={discard}>Cancel / Discard import</button></div>
+      <p className="review-apply-note">Applying replaces the lesson overview, objectives, steps, concepts, troubleshooting, activities, quiz and teacher notes with this edited staged copy, then opens the full draft editor. Your video, source transcript, folder and resources stay attached. Nothing is published automatically.</p>
+      <div className="editor-actions"><button className="primary" onClick={() => run(() => { const checked = parseChatgptLesson(JSON.stringify(candidate), lesson); const editedLesson = applyChatgptLesson(checked, lesson); onApplyAndEdit(editedLesson); setCandidate(null); setRaw(""); setStagedDirty(false); setShowReviewVideo(false); })}>Apply &amp; continue editing draft</button><button className="secondary" onClick={discard}>Cancel / Discard import</button></div>
     </section>}
   </div>;
 }
