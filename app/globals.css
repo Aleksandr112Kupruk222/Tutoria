@@ -2280,6 +2280,78 @@ footer,
 .exchange-stage summary { cursor: pointer; font-weight: 600; }
 .exchange-step { padding: 14px 0; }
 .chatgpt-exchange textarea { max-width: 100%; font-family: monospace; }
+.review-editor textarea { font-family: inherit; }
+.review-heading,
+.review-source,
+.review-section-heading,
+.review-step-heading,
+.teacher-check-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+.review-heading > div,
+.review-source > div,
+.review-section-heading > div { min-width: 0; }
+.review-heading p,
+.review-source p,
+.review-section-heading p { margin: 4px 0 0; }
+.review-source {
+  border: 1px solid #d8e3df;
+  background: #f3f8f6;
+  border-radius: 9px;
+  padding: 16px;
+  margin: 18px 0;
+}
+.review-source .secondary { margin: 0; flex-shrink: 0; }
+.review-video {
+  aspect-ratio: 16/9;
+  max-width: 760px;
+  background: #100c1b;
+  border-radius: 9px;
+  overflow: hidden;
+  margin: 18px 0;
+}
+.review-video :is(.synced-video, iframe) { width: 100%; height: 100%; border: 0; }
+.review-group {
+  border: 1px solid #dfd9e9;
+  border-radius: 9px;
+  padding: 18px;
+  margin: 20px 0;
+}
+.review-group legend { font-weight: 700; padding: 0 8px; }
+.review-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 14px; }
+.review-list-row,
+.review-option { display: flex; align-items: center; gap: 10px; margin: 10px 0; }
+.review-list-row > input,
+.review-option > input:last-child { flex: 1; }
+.secondary.compact { padding: 8px 11px; margin: 0; font-size: 11px; }
+.review-section-heading { align-items: flex-end; margin: 26px 0 12px; }
+.review-section-heading h4 { margin: 0; }
+.review-section-heading > span { color: #826895; font-size: 12px; white-space: nowrap; }
+.exchange-stage details.review-section { border: 1px solid #dfd9e9; border-radius: 8px; padding: 0; margin: 12px 0; }
+.review-section > summary { padding: 16px; }
+.review-section[open] > summary { border-bottom: 1px solid #dfd9e9; }
+.review-section > label { padding: 16px 16px 0; }
+.review-step { padding: 18px 16px; border-top: 1px solid #ebe6f0; scroll-margin: 24px; }
+.review-step:first-of-type { border-top: 0; }
+.review-step-heading { margin-bottom: 4px; }
+.review-step .timestamp { flex-shrink: 0; }
+.review-card,
+.teacher-check { border: 1px solid #e2dcea; border-radius: 8px; padding: 16px; margin: 12px 0; }
+.teacher-check { border-left: 4px solid #c326c8; }
+.teacher-check.resolved { border-left-color: #2b9a68; opacity: .82; }
+.teacher-check-actions { justify-content: flex-start; flex-wrap: wrap; }
+.resolved-toggle { display: inline-flex !important; flex-direction: row !important; align-items: center; gap: 8px; margin: 0 auto 0 0 !important; }
+.review-apply-note { border-top: 1px solid #dfd9e9; padding-top: 18px; margin-top: 24px; }
+@media (max-width: 700px) {
+  .review-grid { grid-template-columns: 1fr; }
+  .review-heading,
+  .review-source,
+  .review-section-heading { align-items: flex-start; flex-direction: column; }
+  .review-section-heading > span { white-space: normal; }
+}
 /* A readable desktop player with the current guide alongside it. */
 @media (min-width: 1100px) {
   .course-shell:has(.lesson-layout) .main-shell { max-width: 1680px; width: 100%; }
@@ -2412,6 +2484,11 @@ html[data-theme="dark"] :is(
   .objectives,
   .lesson-body,
   .exchange-stage,
+  .review-source,
+  .review-group,
+  .review-section,
+  .review-card,
+  .teacher-check,
   .next-card,
   .sample-note
 ) {
@@ -2522,6 +2599,23 @@ html[data-theme="dark"] .course-shell :is(details, .quiz-question label) {
 }
 html[data-theme="dark"] .course-shell .quiz-question label:hover {
   background: #241a30;
+}
+html[data-theme="dark"] .review-source {
+  background: #132422;
+  border-color: #31504b;
+}
+html[data-theme="dark"] :is(
+  .review-section[open] > summary,
+  .review-step,
+  .review-apply-note
+) {
+  border-color: #3b3048;
+}
+html[data-theme="dark"] .teacher-check {
+  border-left-color: #d845dc;
+}
+html[data-theme="dark"] .teacher-check.resolved {
+  border-left-color: #43bd83;
 }
 html[data-theme="dark"] .course-shell .checkpoint,
 html[data-theme="dark"] .course-shell .quiz-question .correct {

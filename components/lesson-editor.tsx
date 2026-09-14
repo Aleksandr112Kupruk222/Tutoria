@@ -45,10 +45,17 @@ export default function LessonEditor({
     [url, setUrl] = useState(
       `https://www.youtube.com/watch?v=${initial.media[0].videoId}`,
     ),
-    [loaded, setLoaded] = useState(false);
+    [loaded, setLoaded] = useState(false),
+    [hasStagedImport, setHasStagedImport] = useState(false);
   const notify = (s: string, e = false) => {
     setStatus(s);
     setError(e);
+  };
+  const canLeaveStagedImport = () => {
+    if (!hasStagedImport) return true;
+    if (!window.confirm("Discard the staged AI lesson import and its edits?")) return false;
+    setHasStagedImport(false);
+    return true;
   };
   useEffect(() => {
     setLoaded(true);
@@ -154,7 +161,7 @@ export default function LessonEditor({
     );
   return (
     <Shell active="teacher">
-      <button className="back" onClick={onClose}>
+      <button className="back" onClick={() => { if (canLeaveStagedImport()) onClose(); }}>
         Back to dashboard
       </button>
       <div className="editor-top">
@@ -170,7 +177,7 @@ export default function LessonEditor({
           <button
             className="primary"
             onClick={() => {
-              if (validate()) setPreview(true);
+              if (canLeaveStagedImport() && validate()) setPreview(true);
             }}
           >
             <Eye size={15} /> Preview lesson
@@ -198,6 +205,7 @@ export default function LessonEditor({
               className={section === s ? "active" : ""}
               key={s}
               onClick={() => {
+                if (s !== section && !canLeaveStagedImport()) return;
                 if (s === "Structured JSON")
                   setJson(JSON.stringify(draft, null, 2));
                 setSection(s);
@@ -218,7 +226,7 @@ export default function LessonEditor({
         </aside>
         <div className="editor-form">
           <h2>{section}</h2>
-          {section === "Prepare with AI" && <ChatgptExchange lesson={draft} onApply={setDraft} />}
+          {section === "Prepare with AI" && <ChatgptExchange lesson={draft} onApply={setDraft} onStagedChange={setHasStagedImport} />}
 
           {section === "Overview" && (
             <>
