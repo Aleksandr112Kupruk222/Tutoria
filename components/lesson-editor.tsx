@@ -28,10 +28,12 @@ const sections = [
 ];
 export default function LessonEditor({
   initial,
+  youtubeConnected,
   onSave,
   onClose,
 }: {
   initial: Lesson;
+  youtubeConnected: boolean;
   onSave: (lesson: Lesson, action: "save" | "publish") => Promise<void>;
   onClose: () => void;
 }) {
@@ -352,7 +354,7 @@ export default function LessonEditor({
           {section === "Video & transcript" && (
             <>
               <p className="editor-help">
-                Paste a YouTube URL, then manually import your own captions.
+                Paste a YouTube URL, then {youtubeConnected ? "fetch owner-authorised captions from your connected channel or import them manually" : "manually import your own captions"}.
                 Import captions in Prepare with AI to generate your lesson guide.
               </p>
               <label>
@@ -382,6 +384,33 @@ export default function LessonEditor({
               >
                 Attach video
               </button>
+              {youtubeConnected && <button
+                className="secondary"
+                disabled={!loaded}
+                onClick={async () => {
+                  const id = youtubeId(url);
+                  if (!id) {
+                    notify("Enter a valid HTTPS YouTube URL before fetching captions.", true);
+                    return;
+                  }
+                  try {
+                    setLoaded(false);
+                    const result = await api<{title:string;description:string;transcript:Lesson["transcript"];warning:string|null}>("/api/youtube/import", {videoId:id});
+                    const mediaId=draft.media[0].id;
+                    update({
+                      media:draft.media.map((media,index)=>index===0?{...media,videoId:id,title:result.title}:media),
+                      ...(result.transcript.length?{transcript:[...draft.transcript.filter(item=>item.mediaId!==mediaId),...result.transcript.map(item=>({...item,mediaId}))]}:{}),
+                    });
+                    notify(result.warning||`Fetched the video title and ${result.transcript.length} caption segments from YouTube. Review them before saving.`);
+                  } catch (caught) {
+                    notify((caught as Error).message, true);
+                  } finally {
+                    setLoaded(true);
+                  }
+                }}
+              >
+                Fetch title &amp; captions from YouTube
+              </button>}
               <label>
                 Video title
                 <input

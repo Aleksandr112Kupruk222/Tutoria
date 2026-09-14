@@ -11,7 +11,7 @@ import {
   type Folder,
   type Session,
 } from "@/lib/api";
-import { youtubeId, parseTranscript, type Lesson } from "@/lib/lessons";
+import { youtubeId, parseTranscript, stamp, type Lesson } from "@/lib/lessons";
 import {buildTranscriptDraft} from "@/lib/draft-builder";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -48,7 +48,7 @@ export default function Teacher() {
     [editing, setEditing] = useState<Entry | null>(null),
     [password, setPassword] = useState(""), [transcriptText,setTranscriptText]=useState("");
   useEffect(()=>{
-    const sync=()=>{setFolderId(new URLSearchParams(window.location.search).get("folder")||"");setDeleting(null);setView("list");};
+    const sync=()=>{const params=new URLSearchParams(window.location.search);setFolderId(params.get("folder")||"");setDeleting(null);setView("list");const youtube=params.get("youtube");if(youtube==="connected")setNotice("YouTube connected. You can now fetch captions from videos you own or manage.");if(youtube==="cancelled")setNotice("YouTube connection was cancelled.");if(youtube){params.delete("youtube");window.history.replaceState({},"",`/teacher/${params.size?`?${params}`:""}`);}};
     sync();window.addEventListener("popstate",sync);return()=>window.removeEventListener("popstate",sync);
   },[]);
   const openFolder=(id:string)=>{setDeletingFolder(false);setFolderId(id);setTargetFolder(id);setView("list");setDeleting(null);setNotice("");setError("");window.history.pushState({},"",id?`/teacher/?folder=${encodeURIComponent(id)}`:"/teacher/");};
@@ -146,6 +146,7 @@ export default function Teacher() {
       <LessonEditor
         key={editing.id}
         initial={editing.lesson}
+        youtubeConnected={Boolean(session.youtube.connection)}
         onClose={() => {
           setEditing(null);
           void refresh();
@@ -211,6 +212,7 @@ export default function Teacher() {
             setView("video");
             setTitle("");
             setUrl("");
+            setTranscriptText("");
             setError("");
           }}
         >
@@ -228,6 +230,15 @@ export default function Teacher() {
           {notice}
         </div>
       )}
+
+      {view === "list" && <section className="youtube-panel">
+        <Video size={28}/>
+        <div>
+          <h3>{session.youtube.connection ? `YouTube connected: ${session.youtube.connection.channel_title}` : "Connect YouTube captions"}</h3>
+          <p>{session.youtube.connection ? "Tutoria can fetch titles and owner-authorised caption tracks when you add or edit a video." : session.youtube.configured ? "Connect the Google account that owns or manages your teaching videos. Manual transcript import will remain available." : "YouTube connection is not configured yet."}</p>
+        </div>
+        {session.youtube.connection ? <Button className="secondary" disabled={busy} onClick={()=>void run(async()=>{const result=await api<{warning:string|null}>("/api/youtube/disconnect",{});await refresh();setNotice(result.warning||"YouTube disconnected from this Tutoria account.");})}>Disconnect</Button> : session.youtube.configured ? <Button className="primary" disabled={busy} onClick={()=>void run(async()=>{const result=await api<{url:string}>("/api/youtube/start",{});window.location.assign(result.url);})}>Connect YouTube</Button> : null}
+      </section>}
 
       {view === "folder" && (
         <form
@@ -331,6 +342,7 @@ export default function Teacher() {
               placeholder="https://www.youtube.com/watch?v=…"
             />
           </label>
+          {session.youtube.connection && <Button className="secondary" type="button" disabled={busy||!url.trim()} onClick={()=>void run(async()=>{const videoId=youtubeId(url);if(!videoId)throw Error("Paste a valid HTTPS YouTube link first.");const result=await api<{title:string;description:string;transcript:Lesson["transcript"];warning:string|null}>("/api/youtube/import",{videoId});setTitle(current=>current.trim()?current:result.title);if(result.transcript.length)setTranscriptText(result.transcript.map(item=>`${stamp(item.seconds)} ${item.text}`).join("\n"));setNotice(result.warning||`Fetched the video title and ${result.transcript.length} caption segments from YouTube.`);})}>Fetch title &amp; captions from YouTube</Button>}
           <div className="two-fields">
             <label>
               Lesson title (optional — add it later)
