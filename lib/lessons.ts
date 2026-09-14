@@ -137,7 +137,13 @@ export function parseTranscript(
   };
   for (const line of raw.replace(/\r/g, "").split("\n")) {
     const s = line.trim();
-    if (!s || s === "WEBVTT" || /^\d+$/.test(s)) continue;
+    if (
+      !s ||
+      s === "WEBVTT" ||
+      /^\d+$/.test(s) ||
+      /^(?:Kind:\s*captions|Language:\s*[a-z-]+)\b/i.test(s)
+    )
+      continue;
     const m = s.match(
       /^(?:(\d{1,2}):)?(\d{1,2}):(\d{2})(?:[.,]\d+)?(?:\s*-->.*|\s+(.+))?$/,
     );
@@ -150,4 +156,63 @@ export function parseTranscript(
   flush();
   if (!result.length) throw new Error("Paste a non-empty transcript.");
   return result;
+}
+
+const transcriptWord = (word: string) =>
+  word.toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu, "");
+
+/**
+ * Removes the rolling overlap used by YouTube automatic captions, then groups
+ * the novel words into readable, timestamped chunks. Ordinary SRT/VTT cues
+ * remain intact unless adjacent cues repeat two or more trailing words.
+ */
+export function cleanTranscript(
+  transcript: Lesson["transcript"],
+): Lesson["transcript"] {
+  const novel: Lesson["transcript"] = [];
+  let history: string[] = [];
+  let previousSeconds = -Infinity;
+
+  for (const cue of transcript) {
+    const words = cue.text.trim().split(/\s+/).filter(Boolean);
+    const normalized = words.map(transcriptWord);
+    const nearby = cue.seconds - previousSeconds <= 12;
+    let overlap = 0;
+
+    if (nearby) {
+      const maximum = Math.min(history.length, normalized.length, 120);
+      for (let size = maximum; size >= 2; size -= 1) {
+        const tail = history.slice(-size);
+        if (tail.every((word, index) => word === normalized[index])) {
+          overlap = size;
+          break;
+        }
+      }
+    } else {
+      history = [];
+    }
+
+    const addedWords = words.slice(overlap);
+    const addedNormalized = normalized.slice(overlap);
+    if (addedWords.length) {
+      novel.push({ ...cue, text: addedWords.join(" ") });
+      history = [...history, ...addedNormalized].slice(-240);
+    }
+    previousSeconds = cue.seconds;
+  }
+
+  const chunks: Lesson["transcript"] = [];
+  for (const cue of novel) {
+    const previous = chunks.at(-1);
+    const previousWords = previous?.text.split(/\s+/).length || 0;
+    const startsNewChunk =
+      !previous ||
+      cue.mediaId !== previous.mediaId ||
+      cue.seconds - previous.seconds > 12 ||
+      previousWords >= 35 ||
+      (previousWords >= 8 && /[.!?]["')\]]?$/.test(previous.text));
+    if (startsNewChunk) chunks.push({ ...cue });
+    else previous.text = `${previous.text} ${cue.text}`;
+  }
+  return chunks;
 }

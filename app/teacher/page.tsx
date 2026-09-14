@@ -370,7 +370,7 @@ export default function Teacher() {
               </select>
             </label>
           </div>
-          <label>Transcript (optional fallback)<Textarea value={transcriptText} onChange={e=>setTranscriptText(e.target.value)} placeholder="Paste timed captions here to start your draft."/></label>
+          <label>Transcript (optional fallback)<Textarea className="transcript-input" value={transcriptText} onChange={e=>setTranscriptText(e.target.value)} placeholder="Paste timed captions here to start your draft."/></label>
           <div className="form-actions">
             <Button className="primary" type="submit" disabled={busy}>
               {busy?'Building draft…':'Create draft'} <ArrowRight size={17} />

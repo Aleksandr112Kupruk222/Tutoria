@@ -8,7 +8,7 @@ import {
   decrypt,
   json,
 } from "./security";
-import { parseTranscript } from "../lib/lessons";
+import { cleanTranscript, parseTranscript } from "../lib/lessons";
 const scope = "https://www.googleapis.com/auth/youtube.force-ssl";
 export const youtubeReady = (env: Env) =>
   !!(
@@ -219,7 +219,7 @@ export async function importVideo(env: Env, user: Teacher, videoId: string) {
     if (raw.length > 800000) throw Error("Caption file too large");
     return {
       ...metadata,
-      transcript: parseTranscript(raw, "screen"),
+      transcript: cleanTranscript(parseTranscript(raw, "screen")),
       warning: null,
     };
   } catch {

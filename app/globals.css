@@ -2098,6 +2098,13 @@ footer,
   margin-top: 8px;
   padding: 12px;
 }
+.dashboard-form .transcript-input {
+  field-sizing: fixed;
+  height: 16rem;
+  max-height: 50vh;
+  overflow-y: auto;
+  resize: vertical;
+}
 .form-actions {
   display: flex;
   gap: 10px;

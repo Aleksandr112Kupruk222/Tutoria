@@ -11,6 +11,8 @@ assert.equal(applied.id,lesson.id);assert.equal(applied.slug,lesson.slug);assert
 assert.deepEqual(applied.media,lesson.media);assert.deepEqual(applied.transcript,lesson.transcript);assert.deepEqual(applied.resources,lesson.resources);
 assert.match(applied.steps[1].title,/Enhanced Input/);assert.deepEqual(applied.teacherReviewNotes,['Confirm graph']);
 assert.match(preparationPackage(lesson),/Source/);
+assert.match(preparationPackage(lesson),/rolling overlap/);
+assert.match(preparationPackage(lesson),/Do not create duplicate sections, steps/);
 assert.throws(()=>parseChatgptLesson(JSON.stringify({...v,videoId:'abcdefghijk'}),lesson),/different video/);
 assert.throws(()=>parseChatgptLesson(JSON.stringify({...v,sections:[{title:'Bad',steps:[{title:'No timestamp',body:'Do it',check:'Done'}]}]}),lesson),/seconds/);
 assert.throws(()=>parseChatgptLesson(JSON.stringify({...v,sections:[{title:'Bad',steps:[{title:'Bad timestamp',seconds:999999,body:'Do it',check:'Done'}]}]}),lesson),/source caption/);
