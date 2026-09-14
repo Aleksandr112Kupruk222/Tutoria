@@ -342,12 +342,14 @@ export function LessonView({
 
   preview = false,
   onExitPreview,
+  onLessonChange,
   folderId,
 }: {
   lesson: Lesson;
 
   preview?: boolean;
   onExitPreview?:()=>void;
+  onLessonChange?:(lesson:Lesson)=>void;
   folderId?:string;
 }) {
   const [tab, setTab] = useState("Guide"),
@@ -375,6 +377,8 @@ export function LessonView({
   };
 
   const current = lesson.steps[step];
+  const editablePreview = preview && Boolean(onLessonChange);
+  const changeLesson = (patch: Partial<Lesson>) => onLessonChange?.({ ...lesson, ...patch });
 
   return (
     <Shell active="lesson">
@@ -385,16 +389,16 @@ export function LessonView({
             {lesson.module} <span>/</span> {lesson.tags[0]}
           </div>
 
-          <h1>{lesson.title}</h1>
+          {editablePreview ? <input className="preview-title-input" aria-label="Lesson title" value={lesson.title} onChange={e=>changeLesson({title:e.target.value})}/> : <h1>{lesson.title}</h1>}
 
-          <p>{lesson.description}</p>
+          {editablePreview ? <textarea className="preview-description-input" aria-label="Lesson description" rows={4} value={lesson.description} onChange={e=>changeLesson({description:e.target.value})}/> : <p>{lesson.description}</p>}
 
           <div className="lesson-meta">
-            <span className="badge">{lesson.difficulty}</span>
+            {editablePreview ? <select className="preview-meta-input badge" aria-label="Difficulty" value={lesson.difficulty} onChange={e=>changeLesson({difficulty:e.target.value as Lesson["difficulty"]})}><option>Beginner</option><option>Intermediate</option><option>Advanced</option></select> : <span className="badge">{lesson.difficulty}</span>}
 
             <span>
               <Clock size={15} />
-              {lesson.durationMinutes} min
+              {editablePreview ? <input className="preview-duration-input" aria-label="Duration in minutes" type="number" min={1} value={lesson.durationMinutes} onChange={e=>changeLesson({durationMinutes:Number(e.target.value)})}/> : lesson.durationMinutes} min
             </span>
 
             <span>
@@ -537,11 +541,10 @@ export function LessonView({
               <GraduationCap size={20} /> What you’ll learn
             </h3>
 
-            {lesson.objectives.map((o) => (
-              <p key={o}>
+            {lesson.objectives.map((o, i) => (
+              <p key={i}>
                 <CheckCircle2 size={16} />
-
-                {o}
+                {editablePreview ? <input aria-label={`Objective ${i+1}`} value={o} onChange={e=>changeLesson({objectives:lesson.objectives.map((value,index)=>index===i?e.target.value:value)})}/> : o}
               </p>
             ))}
           </div>
@@ -596,9 +599,9 @@ export function LessonView({
                   </button>
                 </div>
 
-                <h2>{current.title}</h2>
+                {editablePreview ? <input className="preview-step-title" aria-label="Step title" value={current.title} onChange={e=>changeLesson({steps:lesson.steps.map((value,index)=>index===step?{...value,title:e.target.value}:value)})}/> : <h2>{current.title}</h2>}
 
-                <p className="instruction">{current.body}</p>
+                {editablePreview ? <textarea className="instruction preview-instruction" aria-label="Step instructions" rows={7} value={current.body} onChange={e=>changeLesson({steps:lesson.steps.map((value,index)=>index===step?{...value,body:e.target.value}:value)})}/> : <p className="instruction">{current.body}</p>}
 
                 {current.code && (
                   <div className="code-block">
@@ -606,9 +609,7 @@ export function LessonView({
                       player.gd <span>GDScript</span>
                     </div>
 
-                    <pre>
-                      <code>{current.code}</code>
-                    </pre>
+                    {editablePreview ? <textarea className="preview-code-input" aria-label="Step code" rows={8} value={current.code} onChange={e=>changeLesson({steps:lesson.steps.map((value,index)=>index===step?{...value,code:e.target.value}:value)})}/> : <pre><code>{current.code}</code></pre>}
                   </div>
                 )}
 
@@ -618,7 +619,7 @@ export function LessonView({
                   <div>
                     <h3>Before you move on</h3>
 
-                    <p>{current.check}</p>
+                    {editablePreview ? <textarea aria-label="Step success check" rows={3} value={current.check} onChange={e=>changeLesson({steps:lesson.steps.map((value,index)=>index===step?{...value,check:e.target.value}:value)})}/> : <p>{current.check}</p>}
                   </div>
                 </div>
 
@@ -682,6 +683,8 @@ export function LessonView({
                   {lesson.sample ? "Sample transcript" : "Full transcript"}
                 </h2>
 
+                {editablePreview && <p className="preview-readonly-note">Original source transcript · read only</p>}
+
                 <label className="search">
                   <Search size={18} />
 
@@ -728,11 +731,11 @@ export function LessonView({
 
                 <h2>Key concepts</h2>
 
-                {lesson.concepts.map((c) => (
-                  <div className="definition" key={c.term}>
-                    <h3>{c.term}</h3>
+                {lesson.concepts.map((c, i) => (
+                  <div className="definition" key={i}>
+                    {editablePreview ? <input aria-label={`Concept ${i+1} term`} value={c.term} onChange={e=>changeLesson({concepts:lesson.concepts.map((value,index)=>index===i?{...value,term:e.target.value}:value)})}/> : <h3>{c.term}</h3>}
 
-                    <p>{c.definition}</p>
+                    {editablePreview ? <textarea aria-label={`Concept ${i+1} definition`} rows={4} value={c.definition} onChange={e=>changeLesson({concepts:lesson.concepts.map((value,index)=>index===i?{...value,definition:e.target.value}:value)})}/> : <p>{c.definition}</p>}
                   </div>
                 ))}
               </>
@@ -744,8 +747,13 @@ export function LessonView({
 
                 <h2>A small fix can change everything.</h2>
 
-                {lesson.troubleshooting.map((t) => (
-                  <details key={t.problem}>
+                {lesson.troubleshooting.map((t, i) => editablePreview ? (
+                  <div className="preview-edit-card" key={i}>
+                    <input aria-label={`Troubleshooting ${i+1} problem`} value={t.problem} onChange={e=>changeLesson({troubleshooting:lesson.troubleshooting.map((value,index)=>index===i?{...value,problem:e.target.value}:value)})}/>
+                    <textarea aria-label={`Troubleshooting ${i+1} solution`} rows={5} value={t.solution} onChange={e=>changeLesson({troubleshooting:lesson.troubleshooting.map((value,index)=>index===i?{...value,solution:e.target.value}:value)})}/>
+                  </div>
+                ) : (
+                  <details key={i}>
                     <summary>
                       {t.problem}
 
@@ -766,13 +774,13 @@ export function LessonView({
 
                 <p className="muted">Choose the level that stretches you.</p>
 
-                {lesson.extensions.map((e) => (
-                  <div className="extension" key={e.level}>
+                {lesson.extensions.map((e, i) => (
+                  <div className="extension" key={i}>
                     <span className="badge">{e.level}</span>
 
-                    <h3>{e.title}</h3>
+                    {editablePreview ? <input aria-label={`${e.level} extension title`} value={e.title} onChange={event=>changeLesson({extensions:lesson.extensions.map((value,index)=>index===i?{...value,title:event.target.value}:value)})}/> : <h3>{e.title}</h3>}
 
-                    <p>{e.body}</p>
+                    {editablePreview ? <textarea aria-label={`${e.level} extension content`} rows={5} value={e.body} onChange={event=>changeLesson({extensions:lesson.extensions.map((value,index)=>index===i?{...value,body:event.target.value}:value)})}/> : <p>{e.body}</p>}
                   </div>
                 ))}
               </>
@@ -791,15 +799,16 @@ export function LessonView({
                 {lesson.quiz.map((q, i) => (
                   <fieldset className="quiz-question" key={q.id}>
                     <legend>
-                      {i + 1}. {q.question}
+                      {i + 1}. {editablePreview ? <input aria-label={`Quiz question ${i+1}`} value={q.question} onChange={e=>changeLesson({quiz:lesson.quiz.map((value,index)=>index===i?{...value,question:e.target.value}:value)})}/> : q.question}
                     </legend>
 
-                    {q.options.map((o, j) => (
-                      <label
-                        className={checked && j === q.answer ? "correct" : ""}
-
-                        key={j}
-                      >
+                    {q.options.map((o, j) => editablePreview ? (
+                      <div className={`preview-quiz-option ${j === q.answer ? "correct" : ""}`} key={j}>
+                        <input type="radio" name={q.id} aria-label={`Mark option ${j+1} correct`} checked={q.answer === j} onChange={() => changeLesson({quiz:lesson.quiz.map((value,index)=>index===i?{...value,answer:j}:value)})}/>
+                        <input aria-label={`Quiz ${i+1} option ${j+1}`} value={o} onChange={e=>changeLesson({quiz:lesson.quiz.map((value,index)=>index===i?{...value,options:value.options.map((option,optionIndex)=>optionIndex===j?e.target.value:option)}:value)})}/>
+                      </div>
+                    ) : (
+                      <label className={checked && j === q.answer ? "correct" : ""} key={j}>
                         <input
                           type="radio"
 
@@ -816,7 +825,9 @@ export function LessonView({
                       </label>
                     ))}
 
-                    {checked && (
+                    {editablePreview && <textarea className="preview-quiz-explanation" aria-label={`Quiz ${i+1} explanation`} rows={4} value={q.explanation} onChange={e=>changeLesson({quiz:lesson.quiz.map((value,index)=>index===i?{...value,explanation:e.target.value}:value)})}/>}
+
+                    {!editablePreview && checked && (
                       <p className="feedback">
                         {answers[q.id] === q.answer
                           ? "Correct."
@@ -827,7 +838,7 @@ export function LessonView({
                   </fieldset>
                 ))}
 
-                {checked ? (
+                {!editablePreview && (checked ? (
                   <div aria-live="polite">
                     <strong>
                       {
@@ -861,7 +872,7 @@ export function LessonView({
                   >
                     Check my answers <Check size={17} />
                   </button>
-                )}
+                ))}
               </>
             )}
 
@@ -871,11 +882,17 @@ export function LessonView({
 
                 <h2>Your toolkit</h2>
 
-                {lesson.resources.map((r) => (
+                {lesson.resources.map((r, i) => editablePreview ? (
+                  <div className="preview-edit-card" key={i}>
+                    <input aria-label={`Resource ${i+1} title`} value={r.title} onChange={e=>changeLesson({resources:lesson.resources.map((value,index)=>index===i?{...value,title:e.target.value}:value)})}/>
+                    <input aria-label={`Resource ${i+1} URL`} type="url" value={r.url} onChange={e=>changeLesson({resources:lesson.resources.map((value,index)=>index===i?{...value,url:e.target.value}:value)})}/>
+                    <textarea aria-label={`Resource ${i+1} description`} rows={3} value={r.description} onChange={e=>changeLesson({resources:lesson.resources.map((value,index)=>index===i?{...value,description:e.target.value}:value)})}/>
+                  </div>
+                ) : (
                   <a
                     className="resource"
 
-                    key={r.url}
+                    key={i}
 
                     href={r.url}
 

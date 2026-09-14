@@ -159,10 +159,10 @@ export default function LessonEditor({
     return (
       <>
         <div className="preview-banner">
-          <strong>Draft preview</strong>
-          <button onClick={() => setPreview(false)}>Return to editor</button>
+          <div><strong>Editable draft preview</strong><span>{status || "Edit the lesson in place, then save it as a private draft."}</span></div>
+          <div className="preview-actions"><button className="primary" disabled={!loaded} onClick={save}><Save size={15}/>Save preview as draft</button><button className="secondary" onClick={() => setPreview(false)}>Return to editor</button></div>
         </div>
-        <LessonView lesson={draft} preview onExitPreview={()=>setPreview(false)} />
+        <LessonView lesson={draft} preview onExitPreview={()=>setPreview(false)} onLessonChange={(next)=>{setDraft(next);notify("Unsaved preview edits — save this draft to keep them.");}} />
       </>
     );
   return (
