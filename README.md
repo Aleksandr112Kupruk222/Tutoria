@@ -1,19 +1,19 @@
-# Tutoria — Games Design Learning Hub
+# Tutoria — Digital Technologies Hub
 
 React / Next.js student and teacher interfaces, a Cloudflare-compatible Worker API, and a SQLite-compatible D1 database. The visual theme uses the supplied near-black, white, cyan, magenta and green reference.
 
 ## What is implemented
 
 - Separate student library and teacher login/dashboard.
-- Aleks and Ben teacher accounts, salted password hashes, expiring HttpOnly sessions, login throttling, same-origin write protection and per-teacher ownership checks.
+- Aleks and Ben teacher accounts, salted password hashes, expiring HttpOnly sessions, login throttling, same-origin write protection and shared teacher access.
 - Initial password `1234`, with a mandatory new password of at least 12 characters before accessing the dashboard or connecting YouTube. Initial account hashes are provisioned through a server secret, not shipped in client code. No public account registration or password recovery is implemented yet.
-- Folders owned by each teacher: create, edit and assign videos. Unreal Engine, 3D Modelling and Sample lessons are created when a teacher completes onboarding.
+- Shared folders and lessons: every teacher can view drafts, edit, publish, move, reorder and delete any lesson. New accounts do not create duplicate starter folders. Deleting a folder preserves its lessons as drafts in teacher-only Unassigned.
 - Add a YouTube URL, edit all lesson content, save private drafts, explicitly publish, or unpublish. Saving edits does not replace the published lesson. Conflicting revisions are rejected.
 - A deterministic, AI-free transcript draft builder: groups timed cues, extracts action passages, uses description chapters when imported during creation, matches a small game-development glossary and flags corrections/warnings. It creates suggested objectives from extracted step titles. Source passages and original timestamps remain available for review. It does not invent code, quizzes or extension activities.
 - Per-teacher YouTube OAuth flow, encrypted refresh-token storage, reconnect/disconnect and owner-authorised video/caption import. Connection stays disabled until the Google configuration below is supplied. This is implemented but has not been exercised with real Google credentials.
 - Basic plain text, timestamped text, SRT and WebVTT import as a fallback. Quizzes, concepts, troubleshooting and extension activities are optional until a teacher writes them.
 
-The existing GDQuest example is illustrative, not a transcript of that video. The user's real video has not been imported: https://www.youtube.com/watch?v=mJF9q-yZ-G8
+The bundled GDQuest example is illustrative. Live teacher-created lessons and accounts are stored in hosted D1, separately from repository sample content.
 
 ## Local development
 
@@ -43,7 +43,7 @@ Next.js exports public UI assets; the Worker provides authenticated API access a
 
 ## Hosted accounts and access
 
-The current review site retains its owner-private Sites access policy. Application passwords are an additional login layer. Creating the Ben application account does not grant Ben access through the outer Sites gate; the owner must separately share the review site with Ben when ready. Do not switch the review site to public while temporary credentials remain unused. Teachers cannot read or mutate one another's drafts or YouTube connections. Students receive only published lesson JSON; quiz answers are visible client-side because this is formative practice.
+The live site is public. Teacher sign-in protects all editing and draft access; every teacher has full collaborative access to all lessons and folders. YouTube connections remain personal to each account. Students receive only published lessons outside Unassigned. Account management requires an administrator. Quiz answers are visible client-side because this is formative practice.
 
 `BOOTSTRAP_ACCOUNTS` is a secret JSON array of `{id,username,name,hash}`. Hashes use independent random salts and PBKDF2-SHA256 with 100,000 iterations (compatible with Workers WebCrypto). The bootstrap inserts only missing accounts and never resets existing passwords. Remove this secret after both accounts have been created. Any future public launch should include stronger password hashing where supported, administrator invitations, recovery, broader IP rate limiting and an explicit access-policy review.
 
@@ -74,7 +74,7 @@ Rule-based extraction is a starting point, not semantic understanding. It can gr
 
 ## Verification
 
-Production compilation and TypeScript are checked. Integration tests cover action extraction, correction flags, glossary matches, login/password change, secure cookie attributes, teacher ownership, cross-site write rejection, unpublished content isolation, draft/published separation, stale revision rejection, unconfigured OAuth and logout. Real Google consent/caption retrieval requires the owner's OAuth setup. The new interface has not been browser-interaction tested in this iteration.
+Production compilation and TypeScript are checked. Integration tests cover action extraction, correction flags, glossary matches, login/password change, secure cookie attributes, shared teacher permissions, cross-site write rejection, unpublished content isolation, draft/published separation, stale revision rejection, unconfigured OAuth and logout. Real Google consent/caption retrieval requires the owner's OAuth setup. The new interface has not been browser-interaction tested in this iteration.
 
 ## Prepare a lesson with your own ChatGPT
 
@@ -94,6 +94,10 @@ The desktop lesson layout prioritises the video. YouTube's IFrame Player API rep
 
 Teacher dashboards can delete published or unpublished lessons. Deletion withdraws the public copy and marks the record deleted so stale editor saves cannot restore it. There is no restore UI. YouTube connection controls are currently hidden; the existing backend OAuth integration remains available for future use.
 
-Sign in as admin through the teacher login to manage accounts. The server-only ADMIN_BOOTSTRAP_HASH creates the initial admin once; an existing password is never reset by bootstrap. The admin must replace its temporary password before accessing management routes. Admins create teacher accounts (temporary passwords require 12 characters), reset passwords and delete accounts. Reset invalidates existing sessions and forces a password change. Account deletion disables login and withdraws its folders and lessons; usernames remain reserved to prevent bootstrap resurrection. The current admin cannot delete itself. These checks are enforced server-side, not just hidden in the UI.
+Sign in as admin through the teacher login to manage accounts. The server-only ADMIN_BOOTSTRAP_HASH creates the initial admin once; an existing password is never reset by bootstrap. The admin must replace its temporary password before accessing management routes. Admins create teacher accounts (temporary passwords require at least 8 characters; first-login replacements require at least 12), reset passwords and delete accounts. Reset invalidates existing sessions and forces a password change. Account deletion disables login but preserves shared folders and lessons; usernames remain reserved to prevent bootstrap resurrection. The current admin cannot delete itself. These checks are enforced server-side, not just hidden in the UI.
 
 The new append-only migration adds role/deleted flags. Existing teachers keep their accounts and lessons. Local dev seeds admin with the same temporary password as the other demo accounts; production stores only its salted hash as a secret. Run tests/integration.mjs and tests/playback.mjs after building.
+
+## Continue from another machine
+
+Read [HANDOFF.md](HANDOFF.md) for the existing live Site identity and the GitHub-to-publication workflow. A GitHub push alone does not deploy this site.
