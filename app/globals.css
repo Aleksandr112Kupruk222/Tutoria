@@ -2408,6 +2408,9 @@ html[data-theme="dark"] :is(
   .lesson-table,
   .lesson-row,
   .student-lesson-row,
+  .chapter-panel,
+  .objectives,
+  .lesson-body,
   .exchange-stage,
   .next-card,
   .sample-note
@@ -2485,6 +2488,40 @@ html[data-theme="dark"] .course-shell .timestamp,
 html[data-theme="dark"] .course-shell .chapter.selected {
   background: #12363d;
   color: #6ae8f0;
+}
+html[data-theme="dark"] .course-shell .chapter {
+  color: #e7dfee;
+}
+html[data-theme="dark"] .course-shell .chapter:hover:not(.selected) {
+  background: #241a30;
+}
+html[data-theme="dark"] .course-shell .progress-track {
+  background: #3a3045;
+}
+html[data-theme="dark"] .course-shell :is(
+  .chapter-title > span,
+  .local-note,
+  .video-caption,
+  .tabs button,
+  .instruction,
+  .step-check,
+  .help-link,
+  .transcript-row p,
+  .definition p,
+  .extension p,
+  details p,
+  .resource p
+) {
+  color: #b9afc5;
+}
+html[data-theme="dark"] .course-shell .lesson-body :is(h2, h3, legend, summary) {
+  color: #f5f1fa;
+}
+html[data-theme="dark"] .course-shell :is(details, .quiz-question label) {
+  border-color: #46384f;
+}
+html[data-theme="dark"] .course-shell .quiz-question label:hover {
+  background: #241a30;
 }
 html[data-theme="dark"] .course-shell .checkpoint,
 html[data-theme="dark"] .course-shell .quiz-question .correct {
