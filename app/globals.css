@@ -2402,6 +2402,7 @@ html[data-theme="dark"] :is(
   .folder-card,
   .start-panel,
   .login-form,
+  .editor-form,
   .dashboard-form,
   .youtube-panel,
   .lesson-table,
@@ -2413,6 +2414,37 @@ html[data-theme="dark"] :is(
 ) {
   background: #191322;
   border-color: #3b3048;
+}
+html[data-theme="dark"] :is(.search, .select-wrap) {
+  background: #191322;
+  border-color: #493c57;
+  color: #9b90a7;
+}
+html[data-theme="dark"] .search input {
+  background: transparent;
+  color: #f7f2fb;
+}
+html[data-theme="dark"] .secondary,
+html[data-theme="dark"] .file-label {
+  background: #251b31;
+  border-color: #4b3c59;
+  color: #ece4f3;
+}
+html[data-theme="dark"] .secondary:hover:not(:disabled),
+html[data-theme="dark"] .file-label:hover {
+  background: #342541;
+  border-color: #6e5680;
+  color: #ffffff;
+}
+html[data-theme="dark"] button:disabled {
+  background: #211b29;
+  border-color: #38303f;
+  color: #817789;
+  opacity: 0.72;
+}
+html[data-theme="dark"] .course-shell .editor-nav button.active {
+  background: #3a173d;
+  color: #ff8cf6;
 }
 html[data-theme="dark"] .folder-card.chosen {
   background: #21172c;
@@ -2428,6 +2460,9 @@ html[data-theme="dark"] :is(input, textarea)::placeholder {
 }
 html[data-theme="dark"] .course-shell .sample-note {
   color: #c8becf;
+}
+html[data-theme="dark"] :is(.editor-help, .muted, .back) {
+  color: #b9afc5;
 }
 html[data-theme="dark"] .course-shell .next-card h3,
 html[data-theme="dark"] .course-shell .next-card a,
