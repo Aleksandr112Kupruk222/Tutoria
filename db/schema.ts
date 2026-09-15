@@ -88,3 +88,28 @@ export const oauthStates = sqliteTable("oauth_states", {
   verifier: text("verifier").notNull(),
   expires: integer("expires").notNull(),
 });
+
+export const feedbackSubmissions = sqliteTable(
+  "feedback_submissions",
+  {
+    id: text("id").primaryKey(),
+    kind: text("kind").notNull(),
+    urgency: integer("urgency").notNull(),
+    message: text("message").notNull(),
+    pagePath: text("page_path").notNull(),
+    pageTitle: text("page_title").notNull().default(""),
+    contextKind: text("context_kind").notNull().default(""),
+    contextId: text("context_id").notNull().default(""),
+    contextTitle: text("context_title").notNull().default(""),
+    reporterId: text("reporter_id"),
+    reporterName: text("reporter_name"),
+    sourceKey: text("source_key").notNull(),
+    status: text("status").notNull().default("new"),
+    createdAt: text("created_at").notNull(),
+    reviewedAt: text("reviewed_at"),
+  },
+  (table) => [
+    index("idx_feedback_status_created").on(table.status, table.createdAt),
+    index("idx_feedback_source_created").on(table.sourceKey, table.createdAt),
+  ],
+);

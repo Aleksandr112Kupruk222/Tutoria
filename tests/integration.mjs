@@ -66,6 +66,8 @@ try {
   await db.batch(extra.split("--> statement-breakpoint").map(s=>s.trim()).filter(Boolean).map(s=>db.prepare(s)));
   const orderingMigration=await readFile("drizzle/0002_vengeful_medusa.sql","utf8");
   await db.batch(orderingMigration.split("--> statement-breakpoint").map(s=>s.trim()).filter(Boolean).map(s=>db.prepare(s)));
+  const feedbackMigration=await readFile("drizzle/0003_plain_archangel.sql","utf8");
+  await db.batch(feedbackMigration.split("--> statement-breakpoint").map(s=>s.trim()).filter(Boolean).map(s=>db.prepare(s)));
   const request = (
     path,
     data,
@@ -219,12 +221,23 @@ try {
   const appendedId=(await appended.json()).entry.id;
   assert.equal((await (await request("/api/teacher/catalog",undefined,ac)).json()).lessons.filter(l=>l.folderId===own.folderId).at(-1).id,appendedId);
   console.log("Passed folder ordering, duplicate/stale ID rejection, CSRF and append-at-end creation.");
+  const submittedFeedback=await request("/api/feedback",{kind:"bug",urgency:2,message:"The next step button does not respond.",pagePath:"/lesson/?id=lesson-one",pageTitle:"Lesson",contextKind:"Lesson",contextId:"lesson-one",contextTitle:"Player controls"},ac);
+  assert.equal(submittedFeedback.status,201);
+  assert.equal((await request("/api/feedback",{kind:"bug",urgency:0,message:"Invalid urgency",pagePath:"/",pageTitle:"",contextKind:"Page",contextId:"",contextTitle:""})).status,400);
+  assert.equal((await request("/api/feedback",{kind:"bug",urgency:2,message:"Cross-site feedback",pagePath:"/",pageTitle:"",contextKind:"Page",contextId:"",contextTitle:""},"","POST","https://attacker.test")).status,403);
+  assert.equal((await request("/api/admin/feedback",undefined,ac)).status,403);
   assert.equal((await request("/api/admin/accounts",undefined,ac)).status,403);
   const adminLogin=await request("/api/auth/login",{username:"admin",password:"1234"});
   const adminCookie=adminLogin.headers.get("set-cookie").split(";")[0];
   assert.equal((await request("/api/admin/accounts",undefined,adminCookie)).status,428);
   assert.equal((await request("/api/auth/password",{password:"admin-new-password"},adminCookie)).status,200);
   assert.equal((await request("/api/admin/accounts",undefined,adminCookie)).status,200);
+  const inbox=(await (await request("/api/admin/feedback",undefined,adminCookie)).json()).feedback;
+  assert.equal(inbox.length,1);
+  assert.equal(inbox[0].context_title,"Player controls");
+  assert.equal(inbox[0].reporter_name,"aleks");
+  assert.equal((await request("/api/admin/feedback?id="+inbox[0].id,{status:"resolved"},adminCookie,"PATCH")).status,200);
+  assert.equal((await (await request("/api/admin/feedback",undefined,adminCookie)).json()).feedback[0].status,"resolved");
   assert.equal((await request("/api/admin/account?id=admin",{},adminCookie,"DELETE")).status,400);
   assert.equal((await request("/api/admin/accounts",{username:"computing",name:"Computing Teacher",password:"eight123"},adminCookie)).status,201);
   assert.equal((await request("/api/admin/accounts",{username:"computing",name:"Duplicate",password:"eight123"},adminCookie)).status,409);

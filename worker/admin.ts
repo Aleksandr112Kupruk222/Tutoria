@@ -3,6 +3,14 @@ import {body,hashPassword,HttpError,json,random,type Env,type Teacher} from "./s
 export async function adminApi(request:Request,env:Env,user:Teacher){
   if(user.role!=="admin")throw new HttpError(403,"Administrator access is required.");
   const url=new URL(request.url),path=url.pathname.replace(/\/$/,"");
+  if(path==="/api/admin/feedback"&&request.method==="GET")return json({feedback:(await env.DB.prepare("SELECT id,kind,urgency,message,page_path,page_title,context_kind,context_id,context_title,reporter_name,status,created_at,reviewed_at FROM feedback_submissions ORDER BY CASE status WHEN 'new' THEN 0 ELSE 1 END, created_at DESC LIMIT 250").all()).results});
+  if(path==="/api/admin/feedback"&&request.method==="PATCH"){
+    const feedbackId=z.string().regex(/^[a-f0-9]{24}$/).parse(url.searchParams.get("id"));
+    const value=z.object({status:z.enum(["new","resolved"])}).parse(await body(request));
+    const result=await env.DB.prepare("UPDATE feedback_submissions SET status=?,reviewed_at=? WHERE id=?").bind(value.status,value.status==="resolved"?new Date().toISOString():null,feedbackId).run();
+    if(!result.meta.changes)throw new HttpError(404,"Feedback message not found.");
+    return json({ok:true});
+  }
   if(path==="/api/admin/accounts"&&request.method==="GET")return json({accounts:(await env.DB.prepare("SELECT id,username,name,role,must_change FROM teachers WHERE deleted=0 ORDER BY name").all()).results});
   if(path==="/api/admin/accounts"&&request.method==="POST"){
     const v=z.object({username:z.string().trim().toLowerCase().regex(/^[a-z0-9][a-z0-9._-]{2,59}$/),name:z.string().trim().min(1).max(100),password:z.string().min(8).max(200)}).parse(await body(request));

@@ -40,13 +40,16 @@ import { lessons, Lesson, stamp } from "@/lib/lessons";
 import { api, type Catalog } from "@/lib/api";
 
 import { FolderOpen, LockKeyhole } from "lucide-react";
+import FeedbackDialog, { type FeedbackContext } from "./feedback-dialog";
 
 export function Shell({
   children,
   active = "library",
+  feedbackContext,
 }: {
   children: ReactNode;
   active?: string;
+  feedbackContext?: FeedbackContext;
 }) {
   const teacher = active === "teacher";
   const [theme, setTheme] = useState<"light" | "dark">("light");
@@ -82,6 +85,7 @@ export function Shell({
           {teacher ? "TEACHER WORKSPACE" : "DIGITAL TECHNOLOGIES HUB"}
         </span>
         <nav>
+          <FeedbackDialog context={feedbackContext || { kind: teacher ? "Teacher workspace" : active === "lesson" ? "Lesson" : "Tutoria page" }} />
           <button
             className="theme-toggle"
             type="button"
@@ -157,7 +161,7 @@ export function Library({folderPage=false}:{folderPage?:boolean}) {
   );
 
   return (
-    <Shell>
+    <Shell feedbackContext={folderPage ? { kind: "Lesson folder", id: selected?.id || folder, title: selected?.name } : { kind: "Lesson library" }}>
       {!folderPage && <><div className="page-heading">
         <div className="eyebrow">DIGITAL TECHNOLOGIES</div>
         <h1>
@@ -381,7 +385,7 @@ export function LessonView({
   const changeLesson = (patch: Partial<Lesson>) => onLessonChange?.({ ...lesson, ...patch });
 
   return (
-    <Shell active="lesson">
+    <Shell active="lesson" feedbackContext={{ kind: preview ? "Draft lesson preview" : "Lesson", id: lesson.id, title: lesson.title }}>
       {preview?<button className="back" onClick={onExitPreview}><ArrowLeft size={15}/>Back to editor</button>:<Link className="back" href={folderId?`/folder/?id=${encodeURIComponent(folderId)}`:"/"}><ArrowLeft size={15}/>{folderId?"Back to folder":"All tutorials"}</Link>}
       <div className="lesson-heading">
         <div>

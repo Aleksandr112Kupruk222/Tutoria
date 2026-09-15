@@ -168,7 +168,7 @@ export default function LessonEditor({
       </>
     );
   return (
-    <Shell active="teacher">
+    <Shell active="teacher" feedbackContext={{ kind: "Lesson editor", id: draft.id, title: draft.title }}>
       <button className="back" onClick={() => { if (canLeaveStagedImport()) onClose(); }}>
         Back to dashboard
       </button>

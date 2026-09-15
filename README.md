@@ -12,6 +12,7 @@ React / Next.js student and teacher interfaces, a Cloudflare-compatible Worker A
 - A deterministic, AI-free transcript draft builder: groups timed cues, extracts action passages, uses description chapters when imported during creation, matches a small game-development glossary and flags corrections/warnings. It creates suggested objectives from extracted step titles. Source passages and original timestamps remain available for review. It does not invent code, quizzes or extension activities.
 - Per-teacher YouTube OAuth flow, encrypted refresh-token storage, reconnect/disconnect and owner-authorised video/caption import. Connection stays disabled until the Google configuration below is supplied.
 - Basic plain text, timestamped text, SRT and WebVTT import as a fallback. YouTube's rolling caption overlap is removed automatically, while genuine later repetition is preserved. Quizzes, concepts, troubleshooting and extension activities are optional until a teacher writes them.
+- Site-wide feedback for bug reports, improvements and content corrections. Submissions include a 1–5 urgency rating and the current page or lesson context, and arrive in an administrator-only inbox where they can be resolved or reopened.
 
 The bundled GDQuest example is illustrative. Live teacher-created lessons and accounts are stored in hosted D1, separately from repository sample content.
 

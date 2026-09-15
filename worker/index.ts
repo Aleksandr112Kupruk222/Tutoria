@@ -149,6 +149,61 @@ export async function handleApi(request: Request, env: Env): Promise<Response> {
         "Set-Cookie": sessionCookie(request, "", 0),
       });
     }
+    if (path === "/api/feedback" && request.method === "POST") {
+      const data = z
+        .object({
+          kind: z.enum(["bug", "improvement", "content"]),
+          urgency: z.number().int().min(1).max(5),
+          message: z.string().trim().min(5).max(4000),
+          pagePath: z.string().trim().regex(/^\/(?!\/)/).max(700),
+          pageTitle: z.string().trim().max(200),
+          contextKind: z.string().trim().max(60),
+          contextId: z.string().trim().max(120),
+          contextTitle: z.string().trim().max(240),
+        })
+        .parse(await body(request));
+      const ip = request.headers.get("cf-connecting-ip") || "local";
+      const sourceKey = await sha(`feedback:${ip}`);
+      const cutoff = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+      const recent = await env.DB.prepare(
+        "SELECT COUNT(*) AS count FROM feedback_submissions WHERE source_key=? AND created_at>=?",
+      )
+        .bind(sourceKey, cutoff)
+        .first<{ count: number }>();
+      if ((recent?.count || 0) >= 5)
+        throw new HttpError(429, "Too many feedback messages. Please try again later.");
+
+      let reporter: { id: string; name: string } | null = null;
+      const token = cookieToken(request);
+      if (/^[a-f0-9]{64}$/.test(token)) {
+        reporter = await env.DB.prepare(
+          "SELECT t.id,t.name FROM sessions s JOIN teachers t ON t.id=s.teacher_id WHERE s.token_hash=? AND s.expires>? AND t.deleted=0",
+        )
+          .bind(await sha(token), Date.now())
+          .first<{ id: string; name: string }>();
+      }
+      const createdAt = new Date().toISOString();
+      await env.DB.prepare(
+        "INSERT INTO feedback_submissions (id,kind,urgency,message,page_path,page_title,context_kind,context_id,context_title,reporter_id,reporter_name,source_key,status,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?, 'new',?)",
+      )
+        .bind(
+          random().slice(0, 24),
+          data.kind,
+          data.urgency,
+          data.message,
+          data.pagePath,
+          data.pageTitle,
+          data.contextKind,
+          data.contextId,
+          data.contextTitle,
+          reporter?.id || null,
+          reporter?.name || null,
+          sourceKey,
+          createdAt,
+        )
+        .run();
+      return json({ ok: true }, 201);
+    }
     if (path === "/api/catalog" && request.method === "GET") {
       await mergeStarterFolders(env);
       const folders = (
